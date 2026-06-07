@@ -445,7 +445,8 @@ button.archive-switch {
   gap: 6px;
 }
 
-.redirect-domain-row {
+.redirect-domain-row,
+.config-list .redirect-domain-row {
   display: flex;
   gap: 6px;
   align-items: center;
@@ -454,6 +455,7 @@ button.archive-switch {
 .redirect-domain-input {
   flex: 1;
   min-width: 0;
+  width: auto;
   padding: 5px 8px;
   border: 1px solid var(--line);
   border-radius: 6px;
