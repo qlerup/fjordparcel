@@ -304,6 +304,11 @@ def public_url_for(endpoint, **values):
     return url_for(endpoint, _external=True, **values)
 
 
+def localhost_url_for(endpoint, **values):
+    port = str(os.environ.get("APP_PORT", "8096") or "8096").strip()
+    return f"http://localhost:{port}{url_for(endpoint, **values)}"
+
+
 def _shipment_category(shipment):
     return classify_shipment_status(
         carrier=shipment.get("carrier"),
@@ -1049,6 +1054,8 @@ def settings():
         postal_counts=postal_counts,
         redirect_uri=public_url_for("mail_callback"),
         google_redirect_uri=public_url_for("google_mail_callback"),
+        localhost_redirect_uri=localhost_url_for("mail_callback"),
+        localhost_google_redirect_uri=localhost_url_for("google_mail_callback"),
         microsoft_config=imap_mail.microsoft_config(),
         google_config=gmail_mail.google_config(),
         microsoft_configured=imap_mail.is_configured(),

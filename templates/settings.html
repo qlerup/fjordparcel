@@ -208,7 +208,19 @@
                 </form>
               {% endif %}
               <dl class="config-list">
-                <div><dt>Omdirigerings-URI</dt><dd><code>{{ google_redirect_uri }}</code></dd></div>
+                <div>
+                  <dt class="redirect-uri-dt">
+                    <span>Omdirigerings-URI</span>
+                    <button type="button" class="archive-switch redirect-uri-toggle" data-redirect-toggle="google" aria-label="Brug localhost" aria-pressed="false">
+                      <span>Brug localhost</span>
+                      <span class="archive-switch-track" aria-hidden="true"><span class="archive-switch-thumb"></span></span>
+                    </button>
+                  </dt>
+                  <dd>
+                    <code data-redirect-domain="google">{{ google_redirect_uri }}</code>
+                    <code data-redirect-localhost="google" hidden>{{ localhost_google_redirect_uri }}</code>
+                  </dd>
+                </div>
                 <div><dt>Client ID</dt><dd>{{ "Gemt krypteret" if google_config.client_id else "Mangler" }}</dd></div>
                 <div><dt>Client secret</dt><dd>{{ "Gemt krypteret" if google_config.client_secret else "Mangler" }}</dd></div>
                 <div><dt>Gmail API scope</dt><dd><code>https://www.googleapis.com/auth/gmail.readonly</code></dd></div>
@@ -257,7 +269,19 @@
                 </form>
               {% endif %}
               <dl class="config-list">
-                <div><dt>Omdirigerings-URI</dt><dd><code>{{ redirect_uri }}</code></dd></div>
+                <div>
+                  <dt class="redirect-uri-dt">
+                    <span>Omdirigerings-URI</span>
+                    <button type="button" class="archive-switch redirect-uri-toggle" data-redirect-toggle="ms" aria-label="Brug localhost" aria-pressed="false">
+                      <span>Brug localhost</span>
+                      <span class="archive-switch-track" aria-hidden="true"><span class="archive-switch-thumb"></span></span>
+                    </button>
+                  </dt>
+                  <dd>
+                    <code data-redirect-domain="ms">{{ redirect_uri }}</code>
+                    <code data-redirect-localhost="ms" hidden>{{ localhost_redirect_uri }}</code>
+                  </dd>
+                </div>
                 <div><dt>Client ID</dt><dd>{{ "Gemt krypteret" if microsoft_config.client_id else "Mangler" }}</dd></div>
                 <div><dt>Client secret</dt><dd>{{ "Gemt krypteret" if microsoft_config.client_secret else "Mangler" }}</dd></div>
                 <div><dt>IMAP-server</dt><dd><code>{{ microsoft_config.imap_host }}:{{ microsoft_config.imap_port }}</code></dd></div>
@@ -531,5 +555,19 @@
         });
       });
     })();
+
+    // Redirect URI localhost toggle
+    document.querySelectorAll('[data-redirect-toggle]').forEach(function (btn) {
+      var key = btn.dataset.redirectToggle;
+      btn.addEventListener('click', function () {
+        var isOn = btn.classList.toggle('is-on');
+        btn.setAttribute('aria-pressed', isOn ? 'true' : 'false');
+        var domain = document.querySelector('[data-redirect-domain="' + key + '"]');
+        var local = document.querySelector('[data-redirect-localhost="' + key + '"]');
+        if (domain) domain.hidden = isOn;
+        if (local) local.hidden = !isOn;
+        btn.querySelector('span').textContent = isOn ? 'Brug eget domæne' : 'Brug localhost';
+      });
+    });
   </script>
 {% endblock %}

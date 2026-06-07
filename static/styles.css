@@ -424,6 +424,21 @@ button:disabled,
   outline-offset: 4px;
 }
 
+button.archive-switch {
+  border: none;
+  background: none;
+  padding: 0;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.redirect-uri-dt {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
 .table-head {
   padding: 12px 14px;
   border-bottom: 1px solid var(--line);
