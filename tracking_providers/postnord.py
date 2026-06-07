@@ -206,46 +206,16 @@ def fetch_postnord_tracking(
                 error=str(exc)[:260],
             )
 
-    # No API key — try scraping the tracking page
-    try:
-        page = _request_text(_tracking_url(number), timeout_seconds)
-    except urllib_error.HTTPError as exc:
-        return TrackingLookupResult(
-            carrier="PostNord",
-            tracking_number=number,
-            status="Ikke fundet" if int(exc.code or 0) == 404 else "Fejl ved opdatering",
-            tracking_url=_tracking_url(number),
-            source="postnord-page",
-            error=f"PostNord svarede med HTTP {int(exc.code or 0)}",
-        )
-    except Exception as exc:
-        return TrackingLookupResult(
-            carrier="PostNord",
-            tracking_number=number,
-            status="Fejl ved opdatering",
-            tracking_url=_tracking_url(number),
-            source="postnord-page",
-            error=str(exc)[:260],
-        )
-
-    try:
-        data = _extract_tracking_response_from_text(page)
-        result = _parse_tracking_response(data, number)
-        result.source = "postnord-page"
-        return result
-    except Exception:
-        pass
-
-    # Page loaded but no parseable data — likely CSR-only page
+    # No API key — PostNord blocks server-side requests, so scraping won't work.
     return TrackingLookupResult(
         carrier="PostNord",
         tracking_number=number,
-        status="Ingen data",
+        status="API-nøgle mangler",
         tracking_url=_tracking_url(number),
-        source="postnord-page",
+        source="postnord-api",
         error=(
-            "PostNord-siden indlæste ikke tracking-data direkte. "
-            "Tilføj POSTNORD_API_KEY til .env for automatisk opdatering. "
-            "Gratis nøgle: developer.postnord.com"
+            "PostNord kræver en gratis API-nøgle for automatisk opdatering. "
+            "Opret konto på developer.postnord.com, kopiér nøglen, "
+            "og tilføj POSTNORD_API_KEY=din-nøgle til .env-filen."
         ),
     )
