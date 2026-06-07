@@ -1,6 +1,7 @@
 import json
 
 import app_config
+import pytest
 import storage
 
 
@@ -19,6 +20,7 @@ def configure_tmp_config(tmp_path, monkeypatch):
         "GOOGLE_CLIENT_ID",
         "GOOGLE_CLIENT_SECRET",
         "GOOGLE_GMAIL_MAX_SCAN_MESSAGES",
+        "PUBLIC_BASE_URL",
     ):
         monkeypatch.delenv(name, raising=False)
 
@@ -118,6 +120,33 @@ def test_saved_settings_override_env_defaults(tmp_path, monkeypatch):
 
     assert settings["tenant"] == "common"
     assert settings["imap_host"] == "imap.example.test"
+
+
+def test_saves_and_loads_public_base_url(tmp_path, monkeypatch):
+    configure_tmp_config(tmp_path, monkeypatch)
+
+    saved = app_config.save_public_base_url("https://fjordparcel.example.dk/")
+
+    assert saved == "https://fjordparcel.example.dk"
+    assert app_config.load_public_base_url() == "https://fjordparcel.example.dk"
+
+
+def test_saved_public_base_url_overrides_env(tmp_path, monkeypatch):
+    configure_tmp_config(tmp_path, monkeypatch)
+    monkeypatch.setenv("PUBLIC_BASE_URL", "https://env.example.dk")
+
+    assert app_config.load_public_base_url() == "https://env.example.dk"
+
+    app_config.save_public_base_url("db.example.dk")
+
+    assert app_config.load_public_base_url() == "https://db.example.dk"
+
+
+def test_public_base_url_rejects_callback_path(tmp_path, monkeypatch):
+    configure_tmp_config(tmp_path, monkeypatch)
+
+    with pytest.raises(ValueError):
+        app_config.save_public_base_url("https://fjordparcel.example.dk/auth/microsoft/callback")
 
 
 def test_migrates_legacy_json_to_encrypted_sqlite(tmp_path, monkeypatch):

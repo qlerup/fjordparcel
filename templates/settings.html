@@ -211,19 +211,19 @@
                 <div>
                   <dt class="redirect-uri-dt">
                     <span>Omdirigerings-URI</span>
-                    <button type="button" class="archive-switch redirect-uri-toggle is-on" data-redirect-toggle="google" aria-pressed="true">
-                      <span>Brug localhost</span>
+                    <button type="button" class="archive-switch redirect-uri-toggle {% if not public_base_url %}is-on{% endif %}" data-redirect-toggle="google" aria-pressed="{{ 'true' if not public_base_url else 'false' }}">
+                      <span>{{ 'Brug localhost' if not public_base_url else 'Brug eget domæne' }}</span>
                       <span class="archive-switch-track" aria-hidden="true"><span class="archive-switch-thumb"></span></span>
                     </button>
                   </dt>
                   <dd>
-                    <code data-redirect-localhost="google">{{ localhost_google_redirect_uri }}</code>
-                    <div data-redirect-domain="google" hidden class="redirect-domain-edit">
+                    <code data-redirect-localhost="google" {% if public_base_url %}hidden{% endif %}>{{ localhost_google_redirect_uri }}</code>
+                    <div data-redirect-domain="google" {% if not public_base_url %}hidden{% endif %} class="redirect-domain-edit">
                       <div class="redirect-domain-row">
-                        <input type="text" class="redirect-domain-input" data-domain-input="google" data-callback-path="/auth/google/callback" placeholder="https://dit-domæne.dk">
+                        <input type="text" class="redirect-domain-input" data-domain-input="google" data-callback-path="/auth/google/callback" value="{{ public_base_url }}" placeholder="https://dit-domæne.dk">
                         <button type="button" class="redirect-save-btn" data-domain-copy="google" hidden title="Anvend domæne"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg></button>
                       </div>
-                      <code data-domain-preview="google" hidden class="redirect-domain-preview"></code>
+                      <code data-domain-preview="google" {% if not public_base_url %}hidden{% endif %} class="redirect-domain-preview">{{ google_redirect_uri if public_base_url else '' }}</code>
                       <p class="redirect-save-status" data-save-status="google" hidden></p>
                     </div>
                   </dd>
@@ -279,19 +279,19 @@
                 <div>
                   <dt class="redirect-uri-dt">
                     <span>Omdirigerings-URI</span>
-                    <button type="button" class="archive-switch redirect-uri-toggle is-on" data-redirect-toggle="ms" aria-pressed="true">
-                      <span>Brug localhost</span>
+                    <button type="button" class="archive-switch redirect-uri-toggle {% if not public_base_url %}is-on{% endif %}" data-redirect-toggle="ms" aria-pressed="{{ 'true' if not public_base_url else 'false' }}">
+                      <span>{{ 'Brug localhost' if not public_base_url else 'Brug eget domæne' }}</span>
                       <span class="archive-switch-track" aria-hidden="true"><span class="archive-switch-thumb"></span></span>
                     </button>
                   </dt>
                   <dd>
-                    <code data-redirect-localhost="ms">{{ localhost_redirect_uri }}</code>
-                    <div data-redirect-domain="ms" hidden class="redirect-domain-edit">
+                    <code data-redirect-localhost="ms" {% if public_base_url %}hidden{% endif %}>{{ localhost_redirect_uri }}</code>
+                    <div data-redirect-domain="ms" {% if not public_base_url %}hidden{% endif %} class="redirect-domain-edit">
                       <div class="redirect-domain-row">
-                        <input type="text" class="redirect-domain-input" data-domain-input="ms" data-callback-path="/auth/microsoft/callback" placeholder="https://dit-domæne.dk">
+                        <input type="text" class="redirect-domain-input" data-domain-input="ms" data-callback-path="/auth/microsoft/callback" value="{{ public_base_url }}" placeholder="https://dit-domæne.dk">
                         <button type="button" class="redirect-save-btn" data-domain-copy="ms" hidden title="Anvend domæne"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg></button>
                       </div>
-                      <code data-domain-preview="ms" hidden class="redirect-domain-preview"></code>
+                      <code data-domain-preview="ms" {% if not public_base_url %}hidden{% endif %} class="redirect-domain-preview">{{ redirect_uri if public_base_url else '' }}</code>
                       <p class="redirect-save-status" data-save-status="ms" hidden></p>
                     </div>
                   </dd>
@@ -609,7 +609,8 @@
       document.querySelectorAll('[data-domain-input]').forEach(function (input) {
         var key = input.dataset.domainInput;
         var saveBtn = document.querySelector('[data-domain-copy="' + key + '"]');
-        input._committed = '';
+        input._committed = input.value.trim();
+        updatePreview(key);
         input.addEventListener('input', function () {
           var changed = input.value.trim() !== input._committed;
           if (saveBtn) saveBtn.hidden = !changed || !input.value.trim();
@@ -627,17 +628,25 @@
         el.hidden = false;
       }
 
-      function pollHealthThenReload(maxMs) {
-        var start = Date.now();
-        function attempt() {
-          fetch('/api/health', {cache: 'no-store'})
-            .then(function(r) { if (r.ok) { location.reload(); } else { retry(); } })
-            .catch(function() { retry(); });
-        }
-        function retry() {
-          if (Date.now() - start < maxMs) { setTimeout(attempt, 1500); } else { location.reload(); }
-        }
-        setTimeout(attempt, 2000);
+      function hideStatusLater(key) {
+        setTimeout(function () {
+          var el = document.querySelector('[data-save-status="' + key + '"]');
+          if (el) el.hidden = true;
+        }, 2200);
+      }
+
+      function applySavedDomain(base) {
+        document.querySelectorAll('[data-domain-input]').forEach(function (input) {
+          var key = input.dataset.domainInput;
+          var saveBtn = document.querySelector('[data-domain-copy="' + key + '"]');
+          input.value = base;
+          input._committed = base;
+          if (saveBtn) {
+            saveBtn.hidden = true;
+            saveBtn.disabled = false;
+          }
+          updatePreview(key);
+        });
       }
 
       document.querySelectorAll('[data-domain-copy]').forEach(function (btn) {
@@ -652,24 +661,17 @@
           btn.disabled = true;
           showStatus(key, 'saving', 'Gemmer...');
 
-          fetch('/api/app-update/set-env', {
+          fetch('/api/settings/public-base-url', {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({updates: {PUBLIC_BASE_URL: base}})
+            body: JSON.stringify({public_base_url: base})
           })
           .then(function(r) { return r.json().then(function(d) { return {ok: r.ok, data: d}; }); })
           .then(function(res) {
             if (!res.ok || !res.data.ok) throw new Error(res.data.error || 'Kunne ikke gemme');
-            if (input) { input._committed = input.value.trim(); }
-            updatePreview(key);
-            btn.hidden = true;
-            btn.disabled = false;
-            showStatus(key, 'restarting', 'Genstarter app…');
-            return fetch('/api/app-update/restart', {method: 'POST'});
-          })
-          .then(function() {
-            showStatus(key, 'restarting', 'Genstarter — venter på svar…');
-            pollHealthThenReload(30000);
+            applySavedDomain(res.data.public_base_url || base);
+            showStatus(key, 'saving', 'Gemt.');
+            hideStatusLater(key);
           })
           .catch(function(err) {
             btn.disabled = false;

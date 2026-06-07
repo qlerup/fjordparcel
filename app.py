@@ -18,6 +18,8 @@ from flask import Flask, flash, jsonify, redirect, render_template, request, sen
 from app_config import (
     save_google_settings,
     save_microsoft_settings,
+    load_public_base_url,
+    save_public_base_url,
     load_automation_settings,
     save_automation_settings,
 )
@@ -298,7 +300,7 @@ def _postnord_pickup_candidates_from_links(text):
 
 
 def public_url_for(endpoint, **values):
-    base_url = os.getenv("PUBLIC_BASE_URL", "").rstrip("/")
+    base_url = load_public_base_url()
     if base_url:
         return f"{base_url}{url_for(endpoint, **values)}"
     return url_for(endpoint, _external=True, **values)
@@ -1033,6 +1035,7 @@ def settings():
     selected_postcodes = carrier_postcodes.get(active_carrier, [])
     postal_counts = {carrier_name: len(codes) for carrier_name, codes in carrier_postcodes.items()}
     automation = load_automation_settings()
+    public_base_url = load_public_base_url()
     if active_mail_account:
         account_automation = load_mail_account_settings(
             active_mail_account["provider"],
@@ -1052,6 +1055,7 @@ def settings():
         carrier_postcodes=carrier_postcodes,
         selected_postcodes=selected_postcodes,
         postal_counts=postal_counts,
+        public_base_url=public_base_url,
         redirect_uri=public_url_for("mail_callback"),
         google_redirect_uri=public_url_for("google_mail_callback"),
         localhost_redirect_uri=localhost_url_for("mail_callback"),
@@ -1302,12 +1306,38 @@ def api_app_update_settings():
     return _app_update_proxy("/settings", method="POST", payload=payload, timeout=10)
 
 
+@app.route("/api/settings/public-base-url", methods=["POST"])
+def api_settings_public_base_url():
+    fb = _require_admin_for_app_update()
+    if fb:
+        return fb
+    body = request.get_json(silent=True) or {}
+    try:
+        public_base_url = save_public_base_url(body.get("public_base_url", ""))
+    except ValueError as error:
+        return jsonify({"ok": False, "error": str(error)}), 400
+    return jsonify(
+        {
+            "ok": True,
+            "public_base_url": public_base_url,
+            "microsoft_redirect_uri": public_url_for("mail_callback"),
+            "google_redirect_uri": public_url_for("google_mail_callback"),
+        }
+    )
+
+
 @app.route("/api/app-update/set-env", methods=["POST"])
 def api_app_update_set_env():
     fb = _require_admin_for_app_update()
     if fb:
         return fb
     body = request.get_json(silent=True) or {}
+    updates = body.get("updates") if isinstance(body, dict) else None
+    if isinstance(updates, dict) and "PUBLIC_BASE_URL" in updates:
+        try:
+            updates["PUBLIC_BASE_URL"] = save_public_base_url(updates.get("PUBLIC_BASE_URL", ""))
+        except ValueError as error:
+            return jsonify({"ok": False, "error": str(error)}), 400
     return _app_update_proxy("/update-env", method="POST", payload=body, timeout=10)
 
 

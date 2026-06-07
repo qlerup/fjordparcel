@@ -2,6 +2,7 @@ import base64
 import json
 import os
 from hashlib import sha256
+from urllib.parse import urlparse
 
 from cryptography.fernet import Fernet, InvalidToken
 
@@ -25,6 +26,8 @@ DEFAULT_GOOGLE_SETTINGS = {
     "google_client_secret": "",
     "google_max_scan_messages": "1000",
 }
+
+PUBLIC_BASE_URL_KEY = "public_base_url"
 
 SENSITIVE_KEYS = {
     "client_id",
@@ -208,6 +211,33 @@ def load_google_settings():
             DEFAULT_GOOGLE_SETTINGS["google_max_scan_messages"],
         ),
     }
+
+
+def normalize_public_base_url(value):
+    text = str(value or "").strip().rstrip("/")
+    if not text:
+        return ""
+    if "://" not in text:
+        text = f"https://{text}"
+    parsed = urlparse(text)
+    if parsed.scheme not in {"http", "https"} or not parsed.netloc:
+        raise ValueError("Domænet skal være en gyldig http(s)-adresse.")
+    if parsed.path not in {"", "/"}:
+        raise ValueError("Domænet må ikke indeholde en sti. Brug kun fx https://dit-domæne.dk.")
+    if parsed.query or parsed.fragment:
+        raise ValueError("Domænet må ikke indeholde querystring eller fragment.")
+    return text.rstrip("/")
+
+
+def load_public_base_url():
+    stored = _load_secure_settings()
+    return str(_first_value(stored.get(PUBLIC_BASE_URL_KEY), os.getenv("PUBLIC_BASE_URL"))).rstrip("/")
+
+
+def save_public_base_url(value):
+    public_base_url = normalize_public_base_url(value)
+    _save_secure_settings({PUBLIC_BASE_URL_KEY: public_base_url})
+    return public_base_url
 
 
 # --- Automation settings (auto mail scan + tracking refresh) ---
