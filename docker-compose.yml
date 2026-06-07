@@ -10,6 +10,16 @@ services:
       FJORDPARCEL_UPDATER_URL: http://fjordparcel-updater:8090
     volumes:
       - ./data:/app/data
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "python -c \"import urllib.request,sys;\\ntry:\\n r=urllib.request.urlopen('http://127.0.0.1:8080/api/health', timeout=3); sys.exit(0 if r.getcode()==200 else 1)\\nexcept Exception:\\n sys.exit(1)\"",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 20s
     restart: unless-stopped
 
   fjordparcel-updater:

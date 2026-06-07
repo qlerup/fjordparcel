@@ -51,7 +51,7 @@ docker compose up --build -d
 | Variabel          | Beskrivelse                                                        |
 |-------------------|--------------------------------------------------------------------|
 | `SECRET_KEY`      | Flask session-nøgle — brug en lang, tilfældig streng i produktion |
-| `PUBLIC_BASE_URL` | Appens offentlige URL — bruges som OAuth redirect-URI              |
+| `PUBLIC_BASE_URL` | Valgfri fallback for appens offentlige URL. Kan ændres i databasen fra **Indstillinger → Mails**. |
 | `APP_ENCRYPTION_KEY` | Valgfri [Fernet](https://cryptography.io/en/latest/fernet/)-nøgle til kryptering af tokens. Genereres automatisk og gemmes lokalt hvis den ikke sættes. |
 
 Data (database, tokens) gemmes i `./data/` og bevares på tværs af genstart.
@@ -61,7 +61,7 @@ Data (database, tokens) gemmes i `./data/` og bevares på tværs af genstart.
 ### Microsoft (Hotmail / Outlook)
 
 1. Opret en app-registrering i [Azure-portalen](https://portal.azure.com/#view/Microsoft_AAD_RegisteredApps)
-2. Tilføj redirect-URI: `<PUBLIC_BASE_URL>/mail/callback`
+2. Tilføj redirect-URI: `<PUBLIC_BASE_URL>/auth/microsoft/callback`
 3. Giv delegeret tilladelse: `IMAP.AccessAsUser.All` (fra Office 365 Exchange Online)
 4. Gem klient-ID og klienthemmelighed under **Indstillinger → Mails → Konfigurér Hotmail**
 
@@ -69,7 +69,7 @@ Data (database, tokens) gemmes i `./data/` og bevares på tværs af genstart.
 
 1. Opret et OAuth 2.0-klient-ID i [Google Cloud Console](https://console.cloud.google.com/)
 2. Aktiver Gmail API og tilføj scope: `https://www.googleapis.com/auth/gmail.readonly`
-3. Tilføj redirect-URI: `<PUBLIC_BASE_URL>/mail/google/callback`
+3. Tilføj redirect-URI: `<PUBLIC_BASE_URL>/auth/google/callback`
 4. Gem klient-ID og klienthemmelighed under **Indstillinger → Mails → Konfigurér Gmail**
 
 > Gmail read-scopes er klassificeret som "restricted" af Google. Til privat brug: hold OAuth-appen i testtilstand og tilføj din Gmail-adresse som testbruger.

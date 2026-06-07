@@ -1,6 +1,5 @@
 import json
 import os
-import re
 import signal
 import subprocess
 import threading
@@ -193,55 +192,6 @@ def cmd_output(args: list[str], timeout: int = 60) -> str:
         msg = (result.stderr or result.stdout or "").strip()
         raise RuntimeError(msg or f"Command failed: {' '.join(args)}")
     return (result.stdout or "").strip()
-
-
-ALLOWED_ENV_KEYS: set = {"PUBLIC_BASE_URL"}
-
-
-def update_env_file(updates: Dict[str, str]) -> Dict[str, Any]:
-    env_path = APP_DIR / ".env"
-    if not env_path.exists():
-        return {"ok": False, "error": f".env not found at {env_path}"}
-    content = env_path.read_text(encoding="utf-8")
-    lines = content.splitlines(keepends=True)
-    updated_keys: set = set()
-    new_lines = []
-    for line in lines:
-        matched_key = None
-        for key in updates:
-            if re.match(rf"^\s*{re.escape(key)}\s*=", line):
-                matched_key = key
-                break
-        if matched_key:
-            new_lines.append(f"{matched_key}={updates[matched_key]}\n")
-            updated_keys.add(matched_key)
-        else:
-            new_lines.append(line)
-    added_keys = []
-    for key, value in updates.items():
-        if key not in updated_keys:
-            if new_lines and not new_lines[-1].endswith("\n"):
-                new_lines.append("\n")
-            new_lines.append(f"{key}={value}\n")
-            added_keys.append(key)
-    env_path.write_text("".join(new_lines), encoding="utf-8")
-    return {"ok": True, "updated": list(updated_keys), "added": added_keys}
-
-
-def restart_service() -> Dict[str, Any]:
-    try:
-        result = subprocess.run(
-            ["docker", "compose", "up", "-d", SERVICE_NAME],
-            cwd=str(APP_DIR),
-            capture_output=True,
-            text=True,
-            timeout=120,
-        )
-        if result.returncode == 0:
-            return {"ok": True}
-        return {"ok": False, "error": (result.stderr or result.stdout or "").strip()}
-    except Exception as exc:
-        return {"ok": False, "error": str(exc)}
 
 
 def current_branch() -> str:
@@ -627,22 +577,6 @@ class Handler(BaseHTTPRequestHandler):
                     "next_auto_check_at": state.get("next_auto_check_at") or "",
                 }
             )
-            return
-        if path == "/update-env":
-            raw_updates = body.get("updates") if isinstance(body, dict) else None
-            if not isinstance(raw_updates, dict):
-                self.send_json({"ok": False, "error": "updates must be an object"}, 400)
-                return
-            allowed = {k: str(v) for k, v in raw_updates.items() if k in ALLOWED_ENV_KEYS}
-            if not allowed:
-                self.send_json({"ok": False, "error": f"No allowed keys in updates. Allowed: {sorted(ALLOWED_ENV_KEYS)}"}, 400)
-                return
-            result = update_env_file(allowed)
-            self.send_json(result, 200 if result.get("ok") else 500)
-            return
-        if path == "/restart":
-            result = restart_service()
-            self.send_json(result, 200 if result.get("ok") else 500)
             return
         self.send_json({"ok": False, "error": "Not found"}, 404)
 

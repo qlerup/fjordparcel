@@ -55,6 +55,7 @@ from storage import (
     remove_carrier_postcode,
     save_mail_account_settings,
     set_shipment_archived,
+    set_shipment_hidden,
     update_shipment_auto_label,
     update_shipment_label,
     update_shipment_mail_status,
@@ -712,8 +713,9 @@ def browserconfig_xml():
 def index():
     archive_due_delivered_shipments()
     show_archived = request.args.get("archived") == "1"
-    active_shipments = list_shipments()
-    archived_shipments = [s for s in list_shipments(include_archived=True) if s.get("is_archived")]
+    current_user = session.get("user_id")
+    active_shipments = list_shipments(current_user=current_user)
+    archived_shipments = [s for s in list_shipments(include_archived=True, current_user=current_user) if s.get("is_archived")]
     ready = [s for s in active_shipments if _shipment_category(s) == "ready"]
     delivered = [s for s in active_shipments if _shipment_category(s) == "delivered"]
     in_transit = [s for s in active_shipments if _shipment_category(s) == "in_transit"]
@@ -727,7 +729,7 @@ def index():
         active_count=len(active_shipments),
         archived_count=len(archived_shipments),
         show_archived=show_archived,
-        stats=get_stats(),
+        stats=get_stats(current_user=current_user),
     )
 
 
@@ -775,6 +777,19 @@ def restore_shipment(shipment_id):
     shipment = set_shipment_archived(shipment_id, False)
     if shipment:
         flash(f"{shipment['tracking_number']} er gendannet.", "success")
+    return _redirect_index_from_form()
+
+
+@app.post("/shipments/<int:shipment_id>/hide")
+def hide_shipment(shipment_id):
+    current_user = session.get("user_id", "")
+    set_shipment_hidden(shipment_id, current_user)
+    return _redirect_index_from_form()
+
+
+@app.post("/shipments/<int:shipment_id>/unhide")
+def unhide_shipment(shipment_id):
+    set_shipment_hidden(shipment_id, "")
     return _redirect_index_from_form()
 
 
@@ -1324,29 +1339,6 @@ def api_settings_public_base_url():
             "google_redirect_uri": public_url_for("google_mail_callback"),
         }
     )
-
-
-@app.route("/api/app-update/set-env", methods=["POST"])
-def api_app_update_set_env():
-    fb = _require_admin_for_app_update()
-    if fb:
-        return fb
-    body = request.get_json(silent=True) or {}
-    updates = body.get("updates") if isinstance(body, dict) else None
-    if isinstance(updates, dict) and "PUBLIC_BASE_URL" in updates:
-        try:
-            updates["PUBLIC_BASE_URL"] = save_public_base_url(updates.get("PUBLIC_BASE_URL", ""))
-        except ValueError as error:
-            return jsonify({"ok": False, "error": str(error)}), 400
-    return _app_update_proxy("/update-env", method="POST", payload=body, timeout=10)
-
-
-@app.route("/api/app-update/restart", methods=["POST"])
-def api_app_update_restart():
-    fb = _require_admin_for_app_update()
-    if fb:
-        return fb
-    return _app_update_proxy("/restart", method="POST", payload={}, timeout=120)
 
 
 if __name__ == "__main__":

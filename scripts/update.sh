@@ -234,8 +234,19 @@ read_env_value() {
 	printf '%s' "$value" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//;s/^"//;s/"$//'
 }
 
+app_data_dir() {
+	data_dir="$(read_env_value DATA_DIR 2>/dev/null || true)"
+	if [ -z "$data_dir" ]; then
+		data_dir="$APP_DIR/data"
+	fi
+	case "$data_dir" in
+		/*) printf '%s' "$data_dir" ;;
+		*) printf '%s/%s' "$APP_DIR" "$data_dir" ;;
+	esac
+}
+
 backup_env_file() {
-	data_dir="${DATA_DIR:-$(read_env_value DATA_DIR || printf '%s' '/app/data')}"
+	data_dir="${DATA_DIR:-$(app_data_dir)}"
 	backup_dir="$data_dir/backups"
 	if [ ! -f "$APP_DIR/.env" ]; then
 		return 0
@@ -324,7 +335,7 @@ EOF
 }
 
 backup_database_from_host() {
-	data_dir="${DATA_DIR:-$(read_env_value DATA_DIR || printf '%s' '/app/data')}"
+	data_dir="${DATA_DIR:-$(app_data_dir)}"
 	db_path="$data_dir/fjordparcel.db"
 	backup_dir="$data_dir/backups"
 	if [ ! -f "$db_path" ]; then
@@ -343,72 +354,34 @@ backup_database() {
 		return 0
 	fi
 	echo "==> Tager database-backup"
-	if backup_database_from_container; then
+	if backup_database_from_host; then
 		return 0
 	fi
-	backup_database_from_host
+	backup_database_from_container || true
 }
 
-http_check() {
-	url="$1"
-	if command -v wget >/dev/null 2>&1; then
-		wget -q -T 5 -O /dev/null "$url" 2>/dev/null
-		return $?
-	fi
-	if command -v curl >/dev/null 2>&1; then
-		curl -sf --max-time 5 "$url" >/dev/null 2>/dev/null
-		return $?
-	fi
-	HEALTH_URL="$url" python3 -c "
-import os, sys, urllib.request
-try: urllib.request.urlopen(os.environ['HEALTH_URL'], timeout=5)
-except: sys.exit(1)
-" 2>/dev/null
-	return $?
+container_health_check() {
+	docker_compose exec -T "$SERVICE_NAME" sh -lc 'python3 - <<PY
+import sys
+import urllib.request
+try:
+    response = urllib.request.urlopen("http://127.0.0.1:8080/api/health", timeout=5)
+    sys.exit(0 if response.getcode() == 200 else 1)
+except Exception:
+    sys.exit(1)
+PY' >/dev/null 2>&1
 }
 
 wait_for_fjordparcel() {
 	elapsed=0
 	echo "==> Venter paa FjordParcel health (timeout ${WAIT_TIMEOUT_SEC}s)"
-
-	in_container=0
-	[ -f "/.dockerenv" ] && in_container=1
-
-	host_port="$(read_env_value APP_PORT 2>/dev/null || true)"
-	host_port="${host_port:-8096}"
-
 	while [ "$elapsed" -lt "$WAIT_TIMEOUT_SEC" ]; do
-		# Look up container by name directly — avoids compose project-name mismatches
-		container_id="$(docker_cmd inspect --format '{{.Id}}' "$SERVICE_NAME" 2>/dev/null || true)"
+		container_id="$(docker_compose ps -q "$SERVICE_NAME" 2>/dev/null || true)"
 		if [ -n "$container_id" ]; then
 			state="$(docker_cmd inspect --format '{{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}' "$container_id" 2>/dev/null || true)"
 			case "$state" in
-				healthy)
-					echo "==> FjordParcel er klar (healthy)"
-					return 0
-					;;
-				running)
-					ok=0
-					container_ip="$(docker_cmd inspect --format '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' "$container_id" 2>/dev/null | tr -d '\n' | awk '{print $1}' || true)"
-					echo "  health-tjek: state=${state} ip=${container_ip:-ingen} host_port=${host_port} container=${in_container} elapsed=${elapsed}s"
-					# Try service DNS name first (works when running inside the same Docker network)
-					if [ "$in_container" = "1" ] && http_check "http://${SERVICE_NAME}:8080/api/health"; then
-						ok=1
-					fi
-					# Try container IP directly
-					if [ "$ok" = "0" ] && [ -n "$container_ip" ] && http_check "http://${container_ip}:8080/api/health"; then
-						ok=1
-					fi
-					# Try host-mapped port (works when running on the host, not inside a container)
-					if [ "$ok" = "0" ] && [ "$in_container" = "0" ] && http_check "http://127.0.0.1:${host_port}/api/health"; then
-						ok=1
-					fi
-					# After 30s of "running" state, consider it ready if no other check succeeded
-					if [ "$ok" = "0" ] && [ "$elapsed" -ge 30 ]; then
-						echo "  HTTP-check svarede ikke — antager klar da containeren har vaeret running i ${elapsed}s"
-						ok=1
-					fi
-					if [ "$ok" = "1" ]; then
+				healthy|running)
+					if container_health_check; then
 						echo "==> FjordParcel er klar"
 						return 0
 					fi
@@ -418,12 +391,7 @@ wait_for_fjordparcel() {
 					docker_compose logs --tail=120 || true
 					return 1
 					;;
-				*)
-					echo "  health-tjek: state='${state:-ukendt}' container=${in_container} elapsed=${elapsed}s"
-					;;
 			esac
-		else
-			echo "  health-tjek: container '${SERVICE_NAME}' ikke fundet endnu, elapsed=${elapsed}s"
 		fi
 		sleep "$WAIT_INTERVAL_SEC"
 		elapsed=$((elapsed + WAIT_INTERVAL_SEC))

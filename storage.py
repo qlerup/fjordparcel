@@ -172,6 +172,7 @@ def _ensure_shipments_columns(db):
         "last_checked_at": "TEXT NOT NULL DEFAULT ''",
         "delivered_at": "TEXT NOT NULL DEFAULT ''",
         "archived_at": "TEXT NOT NULL DEFAULT ''",
+        "hidden_by": "TEXT NOT NULL DEFAULT ''",
     }
     for column, ddl in additions.items():
         if column not in existing:
@@ -192,6 +193,7 @@ def row_to_dict(row):
 
     item["events"] = parsed_events if isinstance(parsed_events, list) else []
     item["is_archived"] = bool(item.get("archived_at"))
+    item["is_hidden"] = bool(item.get("hidden_by"))
     item["tracking_last_four_digits"] = tracking_digits[-4:] if len(tracking_digits) >= 4 else tracking_digits
     return item
 
@@ -538,16 +540,24 @@ def archive_due_delivered_shipments(now=None):
     return archived_count
 
 
-def list_shipments(include_archived=False):
+def list_shipments(include_archived=False, current_user=None):
+    clauses = []
+    params = []
+    if not include_archived:
+        clauses.append("COALESCE(archived_at, '') = ''")
+    if current_user is not None:
+        clauses.append("(COALESCE(hidden_by, '') = '' OR hidden_by = ?)")
+        params.append(current_user)
+    where = ("WHERE " + " AND ".join(clauses)) if clauses else ""
     with get_connection() as db:
-        where = "" if include_archived else "WHERE COALESCE(archived_at, '') = ''"
         rows = db.execute(
             f"""
             SELECT *
             FROM shipments
             {where}
             ORDER BY datetime(last_seen_at) DESC, id DESC
-            """
+            """,
+            params,
         ).fetchall()
     return [row_to_dict(row) for row in rows]
 
@@ -558,13 +568,17 @@ def get_shipment(shipment_id):
     return row_to_dict(row)
 
 
-def get_stats():
+def get_stats(current_user=None):
     with get_connection() as db:
-        active_filter = "COALESCE(archived_at, '') = ''"
-        total = db.execute(f"SELECT COUNT(*) FROM shipments WHERE {active_filter}").fetchone()[0]
-        mail = db.execute(f"SELECT COUNT(*) FROM shipments WHERE source = 'mail' AND {active_filter}").fetchone()[0]
-        manual = db.execute(f"SELECT COUNT(*) FROM shipments WHERE source = 'manual' AND {active_filter}").fetchone()[0]
-        archived = db.execute("SELECT COUNT(*) FROM shipments WHERE COALESCE(archived_at, '') != ''").fetchone()[0]
+        vis_filter = "COALESCE(archived_at, '') = '' AND (COALESCE(hidden_by, '') = '' OR hidden_by = ?)" if current_user else "COALESCE(archived_at, '') = ''"
+        params = (current_user,) if current_user else ()
+        active_filter = "COALESCE(archived_at, '') = '' AND (COALESCE(hidden_by, '') = '' OR hidden_by = ?)" if current_user else "COALESCE(archived_at, '') = ''"
+        total = db.execute(f"SELECT COUNT(*) FROM shipments WHERE {vis_filter}", params).fetchone()[0]
+        mail = db.execute(f"SELECT COUNT(*) FROM shipments WHERE source = 'mail' AND {vis_filter}", params).fetchone()[0]
+        manual = db.execute(f"SELECT COUNT(*) FROM shipments WHERE source = 'manual' AND {vis_filter}", params).fetchone()[0]
+        archived_params = (current_user,) if current_user else ()
+        archived_filter = "(COALESCE(hidden_by, '') = '' OR hidden_by = ?)" if current_user else "1=1"
+        archived = db.execute(f"SELECT COUNT(*) FROM shipments WHERE COALESCE(archived_at, '') != '' AND {archived_filter}", archived_params).fetchone()[0]
         latest_scan = db.execute(
             "SELECT * FROM scan_runs ORDER BY datetime(created_at) DESC, id DESC LIMIT 1"
         ).fetchone()
@@ -575,6 +589,16 @@ def get_stats():
         "archived": archived,
         "latest_scan": row_to_dict(latest_scan),
     }
+
+
+def set_shipment_hidden(shipment_id, hidden_by):
+    with get_connection() as db:
+        db.execute(
+            "UPDATE shipments SET hidden_by = ?, updated_at = ? WHERE id = ?",
+            (hidden_by, utc_now(), int(shipment_id)),
+        )
+        row = db.execute("SELECT * FROM shipments WHERE id = ?", (int(shipment_id),)).fetchone()
+    return row_to_dict(row)
 
 
 def add_shipment(

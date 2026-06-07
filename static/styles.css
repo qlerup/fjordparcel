@@ -831,6 +831,28 @@ button.archive-switch {
   text-transform: uppercase;
 }
 
+.hidden-pill {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.hide-button {
+  background: #6b7c77;
+}
+
+.hide-button.is-hidden {
+  background: var(--amber, #e4a417);
+  color: #3b2a08;
+}
+
+.hide-button:hover {
+  background: #566762;
+}
+
+.hide-button.is-hidden:hover {
+  background: #d7a33b;
+}
+
 .label-text-toggle:hover {
   background: transparent;
   color: var(--pine);
