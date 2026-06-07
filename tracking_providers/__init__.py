@@ -6,6 +6,7 @@ from .common import TrackingLookupResult
 from .bring import fetch_bring_tracking
 from .dao import fetch_dao_tracking
 from .gls import fetch_gls_tracking
+from .postnord import fetch_postnord_tracking
 
 
 def fetch_tracking(
@@ -22,6 +23,8 @@ def fetch_tracking(
         return fetch_dao_tracking(tracking_number, postal_codes=postal_codes, timeout=timeout)
     if carrier_name == "bring":
         return fetch_bring_tracking(tracking_number, postal_codes=postal_codes, timeout=timeout)
+    if carrier_name == "postnord":
+        return fetch_postnord_tracking(tracking_number, postal_codes=postal_codes, timeout=timeout)
 
     raise ValueError(f"Tracking provider is not implemented yet for carrier: {carrier or 'Unknown'}")
 
@@ -32,4 +35,5 @@ __all__ = [
     "fetch_bring_tracking",
     "fetch_dao_tracking",
     "fetch_gls_tracking",
+    "fetch_postnord_tracking",
 ]
