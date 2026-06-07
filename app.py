@@ -1279,6 +1279,14 @@ def api_app_update_start():
     return _app_update_proxy("/start", method="POST", payload={"cleanup": cleanup}, timeout=10)
 
 
+@app.route("/api/app-update/force-stop", methods=["POST"])
+def api_app_update_force_stop():
+    fb = _require_admin_for_app_update()
+    if fb:
+        return fb
+    return _app_update_proxy("/force-stop", method="POST", payload={}, timeout=15)
+
+
 @app.route("/api/app-update/settings", methods=["GET", "POST"])
 def api_app_update_settings():
     fb = _require_admin_for_app_update()
@@ -1292,6 +1300,23 @@ def api_app_update_settings():
         "auto_check_interval_minutes": body.get("auto_check_interval_minutes"),
     }
     return _app_update_proxy("/settings", method="POST", payload=payload, timeout=10)
+
+
+@app.route("/api/app-update/set-env", methods=["POST"])
+def api_app_update_set_env():
+    fb = _require_admin_for_app_update()
+    if fb:
+        return fb
+    body = request.get_json(silent=True) or {}
+    return _app_update_proxy("/update-env", method="POST", payload=body, timeout=10)
+
+
+@app.route("/api/app-update/restart", methods=["POST"])
+def api_app_update_restart():
+    fb = _require_admin_for_app_update()
+    if fb:
+        return fb
+    return _app_update_proxy("/restart", method="POST", payload={}, timeout=120)
 
 
 if __name__ == "__main__":

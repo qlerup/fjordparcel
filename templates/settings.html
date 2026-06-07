@@ -224,6 +224,7 @@
                         <button type="button" class="redirect-save-btn" data-domain-copy="google" hidden title="Anvend domæne"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg></button>
                       </div>
                       <code data-domain-preview="google" hidden class="redirect-domain-preview"></code>
+                      <p class="redirect-save-status" data-save-status="google" hidden></p>
                     </div>
                   </dd>
                 </div>
@@ -291,6 +292,7 @@
                         <button type="button" class="redirect-save-btn" data-domain-copy="ms" hidden title="Anvend domæne"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg></button>
                       </div>
                       <code data-domain-preview="ms" hidden class="redirect-domain-preview"></code>
+                      <p class="redirect-save-status" data-save-status="ms" hidden></p>
                     </div>
                   </dd>
                 </div>
@@ -496,6 +498,7 @@
         <div class="button-row">
           <button type="button" id="appUpdateCheckBtn">Tjek for opdatering</button>
           <button type="button" id="appUpdateStartBtn" class="button-link">Opdater nu</button>
+          <button type="button" id="appUpdateForceStopBtn" class="danger-button" hidden>Force stop</button>
         </div>
 
         <div id="appUpdateStatus" style="display:none;margin-top:.75rem;padding:.5rem .75rem;border-radius:6px;font-size:.9rem"></div>
@@ -616,20 +619,62 @@
         });
       });
 
+      function showStatus(key, type, msg) {
+        var el = document.querySelector('[data-save-status="' + key + '"]');
+        if (!el) return;
+        el.textContent = msg;
+        el.className = 'redirect-save-status redirect-save-status--' + type;
+        el.hidden = false;
+      }
+
+      function pollHealthThenReload(maxMs) {
+        var start = Date.now();
+        function attempt() {
+          fetch('/api/health', {cache: 'no-store'})
+            .then(function(r) { if (r.ok) { location.reload(); } else { retry(); } })
+            .catch(function() { retry(); });
+        }
+        function retry() {
+          if (Date.now() - start < maxMs) { setTimeout(attempt, 1500); } else { location.reload(); }
+        }
+        setTimeout(attempt, 2000);
+      }
+
       document.querySelectorAll('[data-domain-copy]').forEach(function (btn) {
         var key = btn.dataset.domainCopy;
         btn.addEventListener('click', function (e) {
           e.preventDefault();
           e.stopPropagation();
-          var uri = buildUri(key);
-          if (!uri) return;
           var input = document.querySelector('[data-domain-input="' + key + '"]');
-          if (input) {
-            // remember committed value so button hides again
-            input._committed = input.value.trim();
-          }
-          updatePreview(key);
-          btn.hidden = true;
+          var base = input ? (input.value || '').trim().replace(/\/+$/, '') : '';
+          if (!base) return;
+
+          btn.disabled = true;
+          showStatus(key, 'saving', 'Gemmer...');
+
+          fetch('/api/app-update/set-env', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({updates: {PUBLIC_BASE_URL: base}})
+          })
+          .then(function(r) { return r.json().then(function(d) { return {ok: r.ok, data: d}; }); })
+          .then(function(res) {
+            if (!res.ok || !res.data.ok) throw new Error(res.data.error || 'Kunne ikke gemme');
+            if (input) { input._committed = input.value.trim(); }
+            updatePreview(key);
+            btn.hidden = true;
+            btn.disabled = false;
+            showStatus(key, 'restarting', 'Genstarter app…');
+            return fetch('/api/app-update/restart', {method: 'POST'});
+          })
+          .then(function() {
+            showStatus(key, 'restarting', 'Genstarter — venter på svar…');
+            pollHealthThenReload(30000);
+          })
+          .catch(function(err) {
+            btn.disabled = false;
+            showStatus(key, 'error', 'Fejl: ' + err.message);
+          });
         });
       });
     })();

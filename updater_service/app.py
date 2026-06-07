@@ -1,5 +1,7 @@
 import json
 import os
+import re
+import signal
 import subprocess
 import threading
 import time
@@ -28,6 +30,7 @@ STATE_PATH = STATE_DIR / "update_state.json"
 LOG_PATH = STATE_DIR / "update.log"
 LOCK = threading.RLock()
 RUNNING_PROCESS: Optional[subprocess.Popen] = None
+STOP_REQUESTED = False
 
 
 def now_iso() -> str:
@@ -100,7 +103,8 @@ def read_state() -> Dict[str, Any]:
         running = bool(RUNNING_PROCESS and RUNNING_PROCESS.poll() is None)
     if running:
         state["running"] = True
-        state["status"] = "running"
+        if state.get("status") != "stopping":
+            state["status"] = "running"
     elif state.get("running"):
         state["running"] = False
     return state
@@ -191,6 +195,55 @@ def cmd_output(args: list[str], timeout: int = 60) -> str:
     return (result.stdout or "").strip()
 
 
+ALLOWED_ENV_KEYS: set = {"PUBLIC_BASE_URL"}
+
+
+def update_env_file(updates: Dict[str, str]) -> Dict[str, Any]:
+    env_path = APP_DIR / ".env"
+    if not env_path.exists():
+        return {"ok": False, "error": f".env not found at {env_path}"}
+    content = env_path.read_text(encoding="utf-8")
+    lines = content.splitlines(keepends=True)
+    updated_keys: set = set()
+    new_lines = []
+    for line in lines:
+        matched_key = None
+        for key in updates:
+            if re.match(rf"^\s*{re.escape(key)}\s*=", line):
+                matched_key = key
+                break
+        if matched_key:
+            new_lines.append(f"{matched_key}={updates[matched_key]}\n")
+            updated_keys.add(matched_key)
+        else:
+            new_lines.append(line)
+    added_keys = []
+    for key, value in updates.items():
+        if key not in updated_keys:
+            if new_lines and not new_lines[-1].endswith("\n"):
+                new_lines.append("\n")
+            new_lines.append(f"{key}={value}\n")
+            added_keys.append(key)
+    env_path.write_text("".join(new_lines), encoding="utf-8")
+    return {"ok": True, "updated": list(updated_keys), "added": added_keys}
+
+
+def restart_service() -> Dict[str, Any]:
+    try:
+        result = subprocess.run(
+            ["docker", "compose", "up", "-d", SERVICE_NAME],
+            cwd=str(APP_DIR),
+            capture_output=True,
+            text=True,
+            timeout=120,
+        )
+        if result.returncode == 0:
+            return {"ok": True}
+        return {"ok": False, "error": (result.stderr or result.stdout or "").strip()}
+    except Exception as exc:
+        return {"ok": False, "error": str(exc)}
+
+
 def current_branch() -> str:
     if DEFAULT_BRANCH:
         return DEFAULT_BRANCH
@@ -244,7 +297,7 @@ def git_info(fetch: bool = False) -> Dict[str, Any]:
 
 
 def run_update_job(job_id: str, cleanup: bool, branch: str) -> None:
-    global RUNNING_PROCESS
+    global RUNNING_PROCESS, STOP_REQUESTED
     cleanup_arg = "--cleanup" if cleanup else "--no-cleanup"
     cmd = ["sh", str(UPDATE_SCRIPT), "--app-dir", str(APP_DIR), cleanup_arg]
     if branch:
@@ -278,6 +331,7 @@ def run_update_job(job_id: str, cleanup: bool, branch: str) -> None:
 
     returncode = 1
     error = ""
+    force_stopped = False
     try:
         proc = subprocess.Popen(
             cmd,
@@ -287,6 +341,7 @@ def run_update_job(job_id: str, cleanup: bool, branch: str) -> None:
             stderr=subprocess.STDOUT,
             text=True,
             bufsize=1,
+            start_new_session=(os.name != "nt"),
         )
         with LOCK:
             RUNNING_PROCESS = proc
@@ -299,9 +354,13 @@ def run_update_job(job_id: str, cleanup: bool, branch: str) -> None:
         append_log(f"[{now_iso()}] ERROR: {error}")
     finally:
         with LOCK:
+            force_stopped = bool(STOP_REQUESTED)
+            STOP_REQUESTED = False
             RUNNING_PROCESS = None
 
-    status = "success" if returncode == 0 and not error else "failed"
+    status = "stopped" if force_stopped else ("success" if returncode == 0 and not error else "failed")
+    if force_stopped and not error:
+        error = "Force stop requested."
     append_log(f"[{now_iso()}] Update finished with status={status} returncode={returncode}")
     info = git_info(fetch=False)
     update_state(
@@ -316,12 +375,92 @@ def run_update_job(job_id: str, cleanup: bool, branch: str) -> None:
     )
 
 
+def terminate_process(proc: subprocess.Popen, grace_seconds: float = 5) -> str:
+    if proc.poll() is not None:
+        return "already-exited"
+
+    method = "terminate"
+    if os.name != "nt":
+        try:
+            pgid = os.getpgid(proc.pid)
+            os.killpg(pgid, signal.SIGTERM)
+            method = "sigterm-process-group"
+        except ProcessLookupError:
+            return "already-exited"
+        except Exception:
+            proc.terminate()
+    else:
+        proc.terminate()
+
+    try:
+        proc.wait(timeout=grace_seconds)
+        return method
+    except subprocess.TimeoutExpired:
+        method = "kill"
+        if os.name != "nt":
+            try:
+                os.killpg(os.getpgid(proc.pid), signal.SIGKILL)
+                method = "sigkill-process-group"
+            except ProcessLookupError:
+                return "already-exited"
+            except Exception:
+                proc.kill()
+        else:
+            proc.kill()
+        try:
+            proc.wait(timeout=2)
+        except Exception:
+            pass
+        return method
+
+
+def force_stop_update() -> tuple[Dict[str, Any], int]:
+    global STOP_REQUESTED
+    with LOCK:
+        proc = RUNNING_PROCESS
+        if not proc or proc.poll() is not None:
+            state = update_state(
+                {
+                    "running": False,
+                    "status": "idle",
+                    "error": "",
+                    "finished_at": now_iso(),
+                    "returncode": None,
+                }
+            )
+            state["ok"] = False
+            state["error"] = "No update is running"
+            state["git"] = git_info(fetch=False)
+            state["log"] = tail_log()
+            return state, 409
+        STOP_REQUESTED = True
+        update_state(
+            {
+                "running": True,
+                "status": "stopping",
+                "error": "Force stop requested.",
+            }
+        )
+
+    append_log(f"[{now_iso()}] Force stop requested")
+    method = terminate_process(proc)
+    append_log(f"[{now_iso()}] Force stop signal sent via {method}")
+    time.sleep(0.2)
+    state = read_state()
+    state["ok"] = True
+    state["git"] = git_info(fetch=False)
+    state["log"] = tail_log()
+    return state, 200
+
+
 def start_update(cleanup: bool) -> tuple[Dict[str, Any], int]:
+    global STOP_REQUESTED
     with LOCK:
         if RUNNING_PROCESS and RUNNING_PROCESS.poll() is None:
             state = read_state()
             state["log"] = tail_log()
             return {"ok": False, "error": "Update already running", **state}, 409
+        STOP_REQUESTED = False
 
     info = git_info(fetch=False)
     if not info.get("available"):
@@ -461,6 +600,10 @@ class Handler(BaseHTTPRequestHandler):
             payload, status = start_update(cleanup=cleanup)
             self.send_json(payload, status)
             return
+        if path == "/force-stop":
+            payload, status = force_stop_update()
+            self.send_json(payload, status)
+            return
         if path == "/settings":
             enabled_raw = body.get("auto_check_enabled")
             enabled = bool(enabled_raw) if "auto_check_enabled" in body else None
@@ -477,6 +620,22 @@ class Handler(BaseHTTPRequestHandler):
                     "next_auto_check_at": state.get("next_auto_check_at") or "",
                 }
             )
+            return
+        if path == "/update-env":
+            raw_updates = body.get("updates") if isinstance(body, dict) else None
+            if not isinstance(raw_updates, dict):
+                self.send_json({"ok": False, "error": "updates must be an object"}, 400)
+                return
+            allowed = {k: str(v) for k, v in raw_updates.items() if k in ALLOWED_ENV_KEYS}
+            if not allowed:
+                self.send_json({"ok": False, "error": f"No allowed keys in updates. Allowed: {sorted(ALLOWED_ENV_KEYS)}"}, 400)
+                return
+            result = update_env_file(allowed)
+            self.send_json(result, 200 if result.get("ok") else 500)
+            return
+        if path == "/restart":
+            result = restart_service()
+            self.send_json(result, 200 if result.get("ok") else 500)
             return
         self.send_json({"ok": False, "error": "Not found"}, 404)
 

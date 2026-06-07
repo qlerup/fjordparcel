@@ -332,6 +332,8 @@ document.addEventListener("DOMContentLoaded", () => {
     if (s === 'available') return 'Opdatering klar';
     if (s === 'checking') return 'Tjekker';
     if (s === 'running') return 'Opdaterer';
+    if (s === 'stopping') return 'Stopper';
+    if (s === 'stopped') return 'Stoppet';
     if (s === 'success') return 'Fuldfort';
     if (s === 'failed') return 'Fejlede';
     return raw || 'Klar';
@@ -449,12 +451,22 @@ document.addEventListener("DOMContentLoaded", () => {
 
     var checkBtn = g('appUpdateCheckBtn');
     var startBtn = g('appUpdateStartBtn');
+    var forceStopBtn = g('appUpdateForceStopBtn');
     if (checkBtn) checkBtn.disabled = running || reconnecting || checkBtn.classList.contains('loading');
     if (startBtn) startBtn.disabled = running || reconnecting || !available || !!git.dirty || !!git.fetch_error || startBtn.classList.contains('loading');
+    if (forceStopBtn) {
+      forceStopBtn.hidden = !running;
+      forceStopBtn.disabled = !running || !serviceOk || forceStopBtn.classList.contains('loading');
+    }
 
     if (hasUpdate && !running) {
       clearReconnect();
       showStatus('Opdatering klar: ' + current + ' → ' + remote, 'ok');
+    } else if (statusRaw === 'stopping') {
+      showStatus('Stopper opdatering...', 'ok');
+    } else if (statusRaw === 'stopped') {
+      clearReconnect();
+      showStatus('Opdatering blev stoppet.', 'err');
     } else if (statusRaw === 'success') {
       if (shouldReload) scheduleReload();
       else { clearReconnect(); showStatus('Opdatering fuldfort.', 'ok'); }
@@ -581,6 +593,31 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
+  function forceStopUpdate() {
+    var btn = g('appUpdateForceStopBtn');
+    if (!window.confirm('Force stop opdateringen nu?')) return;
+    clearReconnect();
+    showStatus('Stopper opdatering...', 'ok');
+    if (btn) { btn.disabled = true; btn.classList.add('loading'); btn.textContent = 'Stopper...'; }
+    fetch('/api/app-update/force-stop', { method: 'POST', headers: { 'Content-Type': 'application/json' } })
+      .then(function (res) { return res.json().then(function (data) { return { ok: res.ok, data: data }; }); })
+      .then(function (r) {
+        render(r.data || {});
+        if (!r.ok || !r.data || r.data.ok === false) {
+          showStatus((r.data && r.data.error) || 'Opdateringen kunne ikke stoppes.', 'err');
+          return;
+        }
+        startPolling();
+      })
+      .catch(function () {
+        showStatus('Updater-service er ikke tilgaengelig.', 'err');
+      })
+      .finally(function () {
+        if (btn) { btn.classList.remove('loading'); btn.textContent = 'Force stop'; }
+        loadStatus({ silent: true }).catch(function () {});
+      });
+  }
+
   function saveSettings() {
     var btn = g('appUpdateSettingsSaveBtn');
     var toggle = g('appUpdateAutoCheckToggle');
@@ -630,6 +667,9 @@ document.addEventListener("DOMContentLoaded", () => {
 
     var startBtn = g('appUpdateStartBtn');
     if (startBtn) startBtn.addEventListener('click', startUpdate);
+
+    var forceStopBtn = g('appUpdateForceStopBtn');
+    if (forceStopBtn) forceStopBtn.addEventListener('click', forceStopUpdate);
 
     var saveBtn = g('appUpdateSettingsSaveBtn');
     if (saveBtn) saveBtn.addEventListener('click', saveSettings);
