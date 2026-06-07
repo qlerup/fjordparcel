@@ -16,8 +16,6 @@ fi
 
 SERVICE_NAME="${SERVICE_NAME:-fjordparcel}"
 REPO_BRANCH="${REPO_BRANCH:-}"
-WAIT_TIMEOUT_SEC="${WAIT_TIMEOUT_SEC:-180}"
-WAIT_INTERVAL_SEC="${WAIT_INTERVAL_SEC:-2}"
 DO_BUILD=1
 NO_CACHE=0
 SKIP_DB_BACKUP=0
@@ -36,7 +34,7 @@ Normal FjordParcel update:
   - appends new active .env.example variables to .env without overwriting values
   - asks whether to run optional Docker cleanup
   - runs docker compose up -d --build
-  - waits for /api/health
+  - prints FjordParcel container logs
 
 Options:
   --app-dir DIR        FjordParcel app directory (default: auto, then /opt/fjordparcel)
@@ -51,7 +49,7 @@ Options:
   -h, --help           Show this help
 
 Environment:
-  APP_DIR, REPO_BRANCH, SERVICE_NAME, WAIT_TIMEOUT_SEC, WAIT_INTERVAL_SEC, CLEANUP_DOCKER, COMPOSE_SERVICES
+  APP_DIR, REPO_BRANCH, SERVICE_NAME, CLEANUP_DOCKER, COMPOSE_SERVICES
 EOF
 }
 
@@ -112,21 +110,6 @@ need_cmd() {
 	if ! command -v "$1" >/dev/null 2>&1; then
 		echo "Fejl: $1 blev ikke fundet i PATH."
 		exit 1
-	fi
-}
-
-validate_wait_settings() {
-	case "$WAIT_TIMEOUT_SEC" in
-		*[!0-9]*|"") WAIT_TIMEOUT_SEC=180 ;;
-	esac
-	case "$WAIT_INTERVAL_SEC" in
-		*[!0-9]*|"") WAIT_INTERVAL_SEC=2 ;;
-	esac
-	if [ "$WAIT_TIMEOUT_SEC" -le 0 ]; then
-		WAIT_TIMEOUT_SEC=180
-	fi
-	if [ "$WAIT_INTERVAL_SEC" -le 0 ]; then
-		WAIT_INTERVAL_SEC=2
 	fi
 }
 
@@ -216,12 +199,9 @@ compose_up_build() {
 	fi
 }
 
-compose_logs_tail() {
-	if [ -n "$COMPOSE_SERVICES" ]; then
-		docker_compose logs --tail=50 $COMPOSE_SERVICES
-	else
-		docker_compose logs --tail=50
-	fi
+show_fjordparcel_logs() {
+	echo "==> FjordParcel logs"
+	docker_cmd logs --tail=120 "$SERVICE_NAME" || true
 }
 
 read_env_value() {
@@ -360,52 +340,8 @@ backup_database() {
 	backup_database_from_container || true
 }
 
-container_health_check() {
-	docker_compose exec -T "$SERVICE_NAME" sh -lc 'python3 - <<PY
-import sys
-import urllib.request
-try:
-    response = urllib.request.urlopen("http://127.0.0.1:8080/api/health", timeout=5)
-    sys.exit(0 if response.getcode() == 200 else 1)
-except Exception:
-    sys.exit(1)
-PY' >/dev/null 2>&1
-}
-
-wait_for_fjordparcel() {
-	elapsed=0
-	echo "==> Venter paa FjordParcel health (timeout ${WAIT_TIMEOUT_SEC}s)"
-	while [ "$elapsed" -lt "$WAIT_TIMEOUT_SEC" ]; do
-		container_id="$(docker_compose ps -q "$SERVICE_NAME" 2>/dev/null || true)"
-		if [ -n "$container_id" ]; then
-			state="$(docker_cmd inspect --format '{{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}' "$container_id" 2>/dev/null || true)"
-			case "$state" in
-				healthy|running)
-					if container_health_check; then
-						echo "==> FjordParcel er klar"
-						return 0
-					fi
-					;;
-				unhealthy|exited|dead)
-					echo "Fejl: FjordParcel status er $state under opstart."
-					docker_compose logs --tail=120 || true
-					return 1
-					;;
-			esac
-		fi
-		sleep "$WAIT_INTERVAL_SEC"
-		elapsed=$((elapsed + WAIT_INTERVAL_SEC))
-	done
-
-	echo "Fejl: timeout mens FjordParcel blev klar."
-	docker_compose ps || true
-	docker_compose logs --tail=120 || true
-	return 1
-}
-
 need_cmd docker
 need_cmd git
-validate_wait_settings
 
 DOCKER_SUDO=""
 if [ "$(id -u)" -ne 0 ] && command -v sudo >/dev/null 2>&1; then
@@ -511,12 +447,12 @@ else
 	compose_up
 fi
 
-wait_for_fjordparcel
+echo "==> Springer health-check over"
 
 echo "==> Status"
 docker_compose ps
 
 if [ "$SHOW_LOGS" = "1" ]; then
 	echo "==> Seneste logs"
-	compose_logs_tail
+	show_fjordparcel_logs
 fi
