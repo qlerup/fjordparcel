@@ -1241,6 +1241,11 @@ def _app_update_proxy(path, method="GET", payload=None, timeout=None):
                         "detail": str(e)}), 503
 
 
+@app.route("/api/health", methods=["GET"])
+def api_health():
+    return jsonify({"ok": True}), 200
+
+
 @app.route("/api/app-update/status", methods=["GET"])
 def api_app_update_status():
     fb = _require_admin_for_app_update()
