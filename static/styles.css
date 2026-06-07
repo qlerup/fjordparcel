@@ -469,31 +469,29 @@ button.archive-switch {
   border-color: var(--pine);
 }
 
-.redirect-copy-btn {
-  display: inline-flex;
+.redirect-save-btn {
+  display: flex;
   align-items: center;
-  gap: 6px;
+  justify-content: center;
   flex-shrink: 0;
-  padding: 0 12px;
-  min-height: 34px;
+  width: 34px;
+  height: 34px;
+  min-height: unset;
+  padding: 0;
   border: 0;
   border-radius: 8px;
   background: var(--pine);
   color: white;
-  font: inherit;
-  font-size: 0.85rem;
-  font-weight: 800;
   cursor: pointer;
-  white-space: nowrap;
-  transition: background 0.15s;
+  transition: background 0.15s, opacity 0.15s;
 }
 
-.redirect-copy-btn:hover {
+.redirect-save-btn:hover {
   background: var(--pine-dark);
 }
 
-.redirect-copy-btn.copied {
-  background: var(--pine-dark);
+.redirect-save-btn[hidden] {
+  display: none;
 }
 
 .redirect-domain-preview {

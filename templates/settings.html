@@ -221,7 +221,7 @@
                     <div data-redirect-domain="google" hidden class="redirect-domain-edit">
                       <div class="redirect-domain-row">
                         <input type="text" class="redirect-domain-input" data-domain-input="google" data-callback-path="/auth/google/callback" placeholder="https://dit-domæne.dk">
-                        <button type="button" class="redirect-copy-btn" data-domain-copy="google" title="Kopiér redirect-URI"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg> Kopiér</button>
+                        <button type="button" class="redirect-save-btn" data-domain-copy="google" hidden title="Anvend domæne"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg></button>
                       </div>
                       <code data-domain-preview="google" hidden class="redirect-domain-preview"></code>
                     </div>
@@ -288,7 +288,7 @@
                     <div data-redirect-domain="ms" hidden class="redirect-domain-edit">
                       <div class="redirect-domain-row">
                         <input type="text" class="redirect-domain-input" data-domain-input="ms" data-callback-path="/auth/microsoft/callback" placeholder="https://dit-domæne.dk">
-                        <button type="button" class="redirect-copy-btn" data-domain-copy="ms" title="Kopiér redirect-URI"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg> Kopiér</button>
+                        <button type="button" class="redirect-save-btn" data-domain-copy="ms" hidden title="Anvend domæne"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg></button>
                       </div>
                       <code data-domain-preview="ms" hidden class="redirect-domain-preview"></code>
                     </div>
@@ -604,8 +604,16 @@
       });
 
       document.querySelectorAll('[data-domain-input]').forEach(function (input) {
-        input.addEventListener('input', function () { updatePreview(input.dataset.domainInput); });
-        input.addEventListener('keydown', function (e) { if (e.key === 'Enter') e.preventDefault(); });
+        var key = input.dataset.domainInput;
+        var saveBtn = document.querySelector('[data-domain-copy="' + key + '"]');
+        input._committed = '';
+        input.addEventListener('input', function () {
+          var changed = input.value.trim() !== input._committed;
+          if (saveBtn) saveBtn.hidden = !changed || !input.value.trim();
+        });
+        input.addEventListener('keydown', function (e) {
+          if (e.key === 'Enter') { e.preventDefault(); if (saveBtn && !saveBtn.hidden) saveBtn.click(); }
+        });
       });
 
       document.querySelectorAll('[data-domain-copy]').forEach(function (btn) {
@@ -615,26 +623,13 @@
           e.stopPropagation();
           var uri = buildUri(key);
           if (!uri) return;
-          var finish = function () {
-            btn.innerHTML = CHECK_ICON + ' Kopieret!';
-            btn.classList.add('copied');
-            setTimeout(function () {
-              btn.innerHTML = CHECK_ICON + ' Kopiér';
-              btn.classList.remove('copied');
-            }, 2000);
-          };
-          if (navigator.clipboard) {
-            navigator.clipboard.writeText(uri).then(finish).catch(finish);
-          } else {
-            var ta = document.createElement('textarea');
-            ta.value = uri;
-            ta.style.cssText = 'position:fixed;opacity:0;pointer-events:none';
-            document.body.appendChild(ta);
-            ta.select();
-            try { document.execCommand('copy'); } catch (ex) {}
-            document.body.removeChild(ta);
-            finish();
+          var input = document.querySelector('[data-domain-input="' + key + '"]');
+          if (input) {
+            // remember committed value so button hides again
+            input._committed = input.value.trim();
           }
+          updatePreview(key);
+          btn.hidden = true;
         });
       });
     })();
