@@ -1229,6 +1229,10 @@ code {
   background: var(--surface-strong);
 }
 
+code[hidden] {
+  display: none;
+}
+
 .flash-stack {
   display: grid;
   gap: 8px;

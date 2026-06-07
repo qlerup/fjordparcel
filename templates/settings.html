@@ -211,14 +211,14 @@
                 <div>
                   <dt class="redirect-uri-dt">
                     <span>Omdirigerings-URI</span>
-                    <button type="button" class="archive-switch redirect-uri-toggle" data-redirect-toggle="google" aria-label="Brug localhost" aria-pressed="false">
-                      <span>Brug localhost</span>
+                    <button type="button" class="archive-switch redirect-uri-toggle is-on" data-redirect-toggle="google" aria-label="Brug eget domæne" aria-pressed="true">
+                      <span>Brug eget domæne</span>
                       <span class="archive-switch-track" aria-hidden="true"><span class="archive-switch-thumb"></span></span>
                     </button>
                   </dt>
                   <dd>
-                    <code data-redirect-domain="google">{{ google_redirect_uri }}</code>
-                    <code data-redirect-localhost="google" hidden>{{ localhost_google_redirect_uri }}</code>
+                    <code data-redirect-domain="google" hidden>{{ google_redirect_uri }}</code>
+                    <code data-redirect-localhost="google">{{ localhost_google_redirect_uri }}</code>
                   </dd>
                 </div>
                 <div><dt>Client ID</dt><dd>{{ "Gemt krypteret" if google_config.client_id else "Mangler" }}</dd></div>
@@ -272,14 +272,14 @@
                 <div>
                   <dt class="redirect-uri-dt">
                     <span>Omdirigerings-URI</span>
-                    <button type="button" class="archive-switch redirect-uri-toggle" data-redirect-toggle="ms" aria-label="Brug localhost" aria-pressed="false">
-                      <span>Brug localhost</span>
+                    <button type="button" class="archive-switch redirect-uri-toggle is-on" data-redirect-toggle="ms" aria-label="Brug eget domæne" aria-pressed="true">
+                      <span>Brug eget domæne</span>
                       <span class="archive-switch-track" aria-hidden="true"><span class="archive-switch-thumb"></span></span>
                     </button>
                   </dt>
                   <dd>
-                    <code data-redirect-domain="ms">{{ redirect_uri }}</code>
-                    <code data-redirect-localhost="ms" hidden>{{ localhost_redirect_uri }}</code>
+                    <code data-redirect-domain="ms" hidden>{{ redirect_uri }}</code>
+                    <code data-redirect-localhost="ms">{{ localhost_redirect_uri }}</code>
                   </dd>
                 </div>
                 <div><dt>Client ID</dt><dd>{{ "Gemt krypteret" if microsoft_config.client_id else "Mangler" }}</dd></div>
@@ -556,7 +556,7 @@
       });
     })();
 
-    // Redirect URI localhost toggle
+    // Redirect URI toggle: ON = localhost visible, OFF = domain visible
     document.querySelectorAll('[data-redirect-toggle]').forEach(function (btn) {
       var key = btn.dataset.redirectToggle;
       btn.addEventListener('click', function () {
