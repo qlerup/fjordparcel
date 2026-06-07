@@ -214,15 +214,52 @@ read_env_value() {
 	printf '%s' "$value" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//;s/^"//;s/"$//'
 }
 
+container_data_mount() {
+	docker_cmd inspect --format '{{range .Mounts}}{{if eq .Destination "/app/data"}}{{.Source}}{{end}}{{end}}' "$SERVICE_NAME" 2>/dev/null || true
+}
+
+is_absolute_path() {
+	case "$1" in
+		/*|[A-Za-z]:[\\/]*|\\\\*) return 0 ;;
+		*) return 1 ;;
+	esac
+}
+
 app_data_dir() {
 	data_dir="$(read_env_value DATA_DIR 2>/dev/null || true)"
+	mount_dir="$(container_data_mount)"
+	if [ -n "$data_dir" ] && ! is_absolute_path "$data_dir" && [ -n "$mount_dir" ]; then
+		data_dir="$mount_dir"
+	fi
+	if [ -z "$data_dir" ]; then
+		data_dir="$mount_dir"
+	fi
 	if [ -z "$data_dir" ]; then
 		data_dir="$APP_DIR/data"
 	fi
-	case "$data_dir" in
-		/*) printf '%s' "$data_dir" ;;
-		*) printf '%s/%s' "$APP_DIR" "$data_dir" ;;
-	esac
+	if is_absolute_path "$data_dir"; then
+		printf '%s' "$data_dir"
+	else
+		printf '%s/%s' "$APP_DIR" "$data_dir"
+	fi
+}
+
+escape_env_value() {
+	printf '%s' "$1" | sed 's/\\/\\\\/g; s/"/\\"/g'
+}
+
+ensure_data_dir_env() {
+	env_file="$APP_DIR/.env"
+	[ -f "$env_file" ] || return 0
+	current="$(read_env_value DATA_DIR 2>/dev/null || true)"
+	if [ -n "$current" ] && is_absolute_path "$current"; then
+		return 0
+	fi
+	{
+		printf '\n# Added by scripts/update.sh on %s so in-app updates keep the existing data mount\n' "$TS"
+		printf 'DATA_DIR="%s"\n' "$(escape_env_value "$DATA_DIR")"
+	} >> "$env_file"
+	echo "==> .env opdateret med DATA_DIR=$DATA_DIR"
 }
 
 backup_env_file() {
@@ -362,8 +399,11 @@ fi
 
 cd "$APP_DIR" || exit 1
 TS="$(date +%Y%m%d-%H%M%S)"
+DATA_DIR="${DATA_DIR:-$(app_data_dir)}"
+export DATA_DIR
 
 echo "==> App directory: $APP_DIR"
+echo "==> Data directory: $DATA_DIR"
 docker_compose config >/dev/null
 
 if [ ! -d .git ]; then
@@ -394,6 +434,7 @@ if [ -f "$SCRIPT_DIR/update.sh" ]; then
 fi
 
 backup_env_file
+ensure_data_dir_env
 backup_database
 
 echo "==> Henter seneste kode fra origin/$REPO_BRANCH"

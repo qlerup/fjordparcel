@@ -52,9 +52,10 @@ docker compose up --build -d
 |-------------------|--------------------------------------------------------------------|
 | `SECRET_KEY`      | Flask session-nøgle — brug en lang, tilfældig streng i produktion |
 | `PUBLIC_BASE_URL` | Valgfri fallback for appens offentlige URL. Kan ændres i databasen fra **Indstillinger → Mails**. |
+| `DATA_DIR`        | Host-sti til data-mappen. Fresh setup sætter den absolut, så in-app updateren genstarter med samme database-mount. |
 | `APP_ENCRYPTION_KEY` | Valgfri [Fernet](https://cryptography.io/en/latest/fernet/)-nøgle til kryptering af tokens. Genereres automatisk og gemmes lokalt hvis den ikke sættes. |
 
-Data (database, tokens) gemmes i `./data/` og bevares på tværs af genstart.
+Data (database, tokens) gemmes som standard i `./data/` og bevares på tværs af genstart.
 
 ## Mailopsætning
 

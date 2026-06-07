@@ -177,6 +177,7 @@ load_env_with_defaults() {
   : "${SECRET_KEY:=}"
   : "${APP_ENCRYPTION_KEY:=}"
   : "${PUBLIC_BASE_URL:=}"
+  : "${DATA_DIR:=${REPO_DIR}/data}"
   : "${DATABASE_PATH:=data/fjordparcel.db}"
   : "${APP_CONFIG_PATH:=data/app_config.json}"
   : "${MS_TOKEN_CACHE_PATH:=data/msal_cache.json}"
@@ -202,6 +203,7 @@ APP_ENCRYPTION_KEY=${APP_ENCRYPTION_KEY}
 PUBLIC_BASE_URL=${PUBLIC_BASE_URL}
 APP_PORT=${APP_PORT}
 TZ=${TZ}
+DATA_DIR=${DATA_DIR}
 DATABASE_PATH=${DATABASE_PATH}
 APP_CONFIG_PATH=${APP_CONFIG_PATH}
 MS_TOKEN_CACHE_PATH=${MS_TOKEN_CACHE_PATH}
@@ -285,13 +287,14 @@ print_summary() {
   echo "  APP_PORT=${APP_PORT}"
   echo "  TZ=${TZ}"
   echo "  PUBLIC_BASE_URL=${PUBLIC_BASE_URL}"
+  echo "  DATA_DIR=${DATA_DIR}"
   echo "  SECRET_KEY=(sat)"
   echo "  APP_ENCRYPTION_KEY=(sat)"
   echo "  FJORDPARCEL_AUTO_UPDATE_CHECK=${FJORDPARCEL_AUTO_UPDATE_CHECK}"
   if is_truthy "$FJORDPARCEL_AUTO_UPDATE_CHECK"; then
     echo "  FJORDPARCEL_AUTO_UPDATE_CHECK_INTERVAL_MINUTES=${FJORDPARCEL_AUTO_UPDATE_CHECK_INTERVAL_MINUTES}"
   fi
-  echo "  Data-mappe: ${REPO_DIR}/data"
+  echo "  Data-mappe: ${DATA_DIR}"
 }
 
 backup_env_once() {
