@@ -383,8 +383,11 @@ def terminate_process(proc: subprocess.Popen, grace_seconds: float = 5) -> str:
     if os.name != "nt":
         try:
             pgid = os.getpgid(proc.pid)
-            os.killpg(pgid, signal.SIGTERM)
-            method = "sigterm-process-group"
+            if pgid != os.getpgrp():
+                os.killpg(pgid, signal.SIGTERM)
+                method = "sigterm-process-group"
+            else:
+                proc.terminate()
         except ProcessLookupError:
             return "already-exited"
         except Exception:
@@ -399,8 +402,12 @@ def terminate_process(proc: subprocess.Popen, grace_seconds: float = 5) -> str:
         method = "kill"
         if os.name != "nt":
             try:
-                os.killpg(os.getpgid(proc.pid), signal.SIGKILL)
-                method = "sigkill-process-group"
+                pgid = os.getpgid(proc.pid)
+                if pgid != os.getpgrp():
+                    os.killpg(pgid, signal.SIGKILL)
+                    method = "sigkill-process-group"
+                else:
+                    proc.kill()
             except ProcessLookupError:
                 return "already-exited"
             except Exception:

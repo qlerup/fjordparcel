@@ -233,16 +233,6 @@ button:hover,
   background: var(--pine-dark);
 }
 
-button.danger-button,
-.button-link.danger-button {
-  background: #b42318;
-}
-
-button.danger-button:hover,
-.button-link.danger-button:hover {
-  background: #8f1c14;
-}
-
 .button-link.secondary-button {
   border: 1px solid var(--line);
   background: var(--surface-strong);
