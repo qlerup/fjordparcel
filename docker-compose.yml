@@ -6,7 +6,29 @@ services:
       - .env
     ports:
       - "8096:8080"
+    environment:
+      FJORDPARCEL_UPDATER_URL: http://fjordparcel-updater:8090
     volumes:
       - ./data:/app/data
     restart: unless-stopped
 
+  fjordparcel-updater:
+    build:
+      context: .
+      dockerfile: updater_service/Dockerfile
+    container_name: fjordparcel-updater
+    working_dir: /repo
+    environment:
+      APP_DIR: /repo
+      SERVICE_NAME: fjordparcel
+      COMPOSE_PROJECT_NAME: ${COMPOSE_PROJECT_NAME:-fjordparcel}
+      COMPOSE_SERVICES: "fjordparcel"
+      FJORDPARCEL_UPDATER_STATE_DIR: /state
+      FJORDPARCEL_AUTO_UPDATE_CHECK: ${FJORDPARCEL_AUTO_UPDATE_CHECK:-1}
+      FJORDPARCEL_AUTO_UPDATE_CHECK_INTERVAL_MINUTES: ${FJORDPARCEL_AUTO_UPDATE_CHECK_INTERVAL_MINUTES:-30}
+      TZ: ${TZ:-Europe/Copenhagen}
+    volumes:
+      - .:/repo
+      - ./data/updater:/state
+      - /var/run/docker.sock:/var/run/docker.sock
+    restart: unless-stopped

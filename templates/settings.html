@@ -14,6 +14,7 @@
     <a class="settings-switch-item {% if section == 'mails' %}active{% endif %}" href="{{ url_for('settings', section='mails') }}" data-tab="mails">Mails</a>
     <a class="settings-switch-item {% if section == 'carriers' %}active{% endif %}" href="{{ url_for('settings', section='carriers', carrier=active_carrier) }}" data-tab="carriers">Fragtfirmaer</a>
     <a class="settings-switch-item {% if section == 'users' %}active{% endif %}" href="{{ url_for('settings', section='users') }}" data-tab="users">Brugere</a>
+    <a class="settings-switch-item {% if section == 'update' %}active{% endif %}" href="{{ url_for('settings', section='update') }}" data-tab="update" id="settingsTabUpdate">Opdatering</a>
   </section>
 
   {# ── General ──────────────────────────────────────────── #}
@@ -424,6 +425,62 @@
         </form>
       </div>
     </dialog>
+  </div>
+
+  {# ── Update ───────────────────────────────────────────── #}
+  <div id="pane-update" {% if section != 'update' %}hidden{% endif %}>
+    <section class="settings-grid single-panel">
+      <div class="panel" id="appUpdatePanel">
+        <div class="panel-heading">
+          <h2>FjordParcel opdatering</h2>
+          <span class="badge" id="appUpdateStateBadge">Klar</span>
+        </div>
+
+        <dl class="config-list" style="margin-bottom:1rem">
+          <div><dt>Branch</dt><dd><strong id="appUpdateBranch">-</strong></dd></div>
+          <div><dt>Installeret</dt><dd><strong id="appUpdateCurrent">-</strong></dd></div>
+          <div><dt>Nyeste</dt><dd><strong id="appUpdateRemote">-</strong></dd></div>
+        </dl>
+
+        <div class="settings-form" style="margin-bottom:1rem">
+          <label style="display:flex;align-items:center;gap:.5rem">
+            <input id="appUpdateAutoCheckToggle" type="checkbox">
+            <span>Automatisk tjek for opdateringer</span>
+          </label>
+          <label style="margin-top:.5rem">
+            <span>Tjek-interval (minutter)</span>
+            <input id="appUpdateIntervalInput" type="number" min="5" max="1440" value="30" style="width:100px">
+          </label>
+          <div class="button-row" style="margin-top:.5rem">
+            <button type="button" id="appUpdateSettingsSaveBtn">Gem indstillinger</button>
+          </div>
+          <small id="appUpdateAutoMeta" style="color:var(--text-muted,#888)"></small>
+        </div>
+
+        <div class="button-row">
+          <button type="button" id="appUpdateCheckBtn">Tjek for opdatering</button>
+          <button type="button" id="appUpdateStartBtn" class="button-link">Opdater nu</button>
+        </div>
+
+        <div id="appUpdateStatus" style="display:none;margin-top:.75rem;padding:.5rem .75rem;border-radius:6px;font-size:.9rem"></div>
+        <pre id="appUpdateLog" style="display:none;margin-top:.75rem;background:var(--surface-alt,#1a1a1a);color:#e0e0e0;padding:.75rem;border-radius:6px;font-size:.78rem;overflow-x:auto;max-height:400px;overflow-y:auto;white-space:pre-wrap;word-break:break-all"></pre>
+      </div>
+    </section>
+
+    <div id="appUpdateChoiceModal" style="display:none;position:fixed;inset:0;z-index:1000;align-items:center;justify-content:center">
+      <div style="position:absolute;inset:0;background:rgba(0,0,0,.5)" id="appUpdateChoiceBackdrop"></div>
+      <div style="position:relative;background:var(--surface,#fff);border-radius:10px;padding:1.5rem;max-width:420px;width:90%;box-shadow:0 8px 32px rgba(0,0,0,.18)">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem">
+          <h3 style="margin:0">V&aelig;lg opdateringstype</h3>
+          <button type="button" id="appUpdateChoiceClose" style="background:none;border:none;font-size:1.4rem;cursor:pointer;padding:0 .25rem">&times;</button>
+        </div>
+        <p style="margin-bottom:1rem">V&aelig;lg om Docker skal ryddes op f&oslash;r opdatering (bruger l&aelig;ngere tid, men frigiver diskplads) eller en hurtig opdatering.</p>
+        <div class="button-row">
+          <button type="button" id="appUpdateChoiceCleanupBtn">Ryd plads og opdater</button>
+          <button type="button" id="appUpdateChoiceFastBtn" class="button-link">Hurtig opdatering</button>
+        </div>
+      </div>
+    </div>
   </div>
 
   <script>

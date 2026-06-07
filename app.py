@@ -1,3 +1,4 @@
+import json
 import os
 import re
 import threading
@@ -78,12 +79,19 @@ app = Flask(__name__)
 app.config["SECRET_KEY"] = os.getenv("SECRET_KEY", "fjordparcel-dev-secret")
 APP_BUILD = os.getenv("APP_BUILD", str(int(os.path.getmtime(__file__))))
 
+APP_UPDATE_SERVICE_URL = str(os.environ.get("FJORDPARCEL_UPDATER_URL", "http://fjordparcel-updater:8090") or "").strip().rstrip("/")
+try:
+    APP_UPDATE_SERVICE_TIMEOUT_SEC = float(os.environ.get("FJORDPARCEL_UPDATER_TIMEOUT_SEC", "20") or 20)
+except Exception:
+    APP_UPDATE_SERVICE_TIMEOUT_SEC = 20.0
+APP_UPDATE_SERVICE_TIMEOUT_SEC = max(2.0, min(120.0, APP_UPDATE_SERVICE_TIMEOUT_SEC))
+
 init_db()
 
 SCAN_JOBS = {}
 SCAN_JOBS_LOCK = threading.Lock()
 SCAN_JOB_TTL_SECONDS = 60 * 60
-SETTINGS_SECTIONS = {"general", "mails", "carriers", "users"}
+SETTINGS_SECTIONS = {"general", "mails", "carriers", "users", "update"}
 GLS_MERCHANT_LABEL_LOOKBACK_SECONDS = 7 * 24 * 60 * 60
 POSTNORD_PICKUP_LINK_TIMEOUT_SECONDS = float(os.getenv("POSTNORD_PICKUP_LINK_TIMEOUT_SECONDS", "8") or "8")
 POSTNORD_PICKUP_LINK_MAX_BYTES = 250_000
@@ -1187,6 +1195,91 @@ def _ensure_automation_thread():
     th = threading.Thread(target=_automation_worker, name="automation-worker", daemon=True)
     th.start()
     _AUTO_THREAD_STARTED = True
+
+
+def _require_admin_for_app_update():
+    if "user_id" not in session:
+        return jsonify({"ok": False, "error": "Forbidden"}), 403
+    if session.get("role") != "admin":
+        return jsonify({"ok": False, "error": "Forbidden"}), 403
+    return None
+
+
+def _app_update_proxy(path, method="GET", payload=None, timeout=None):
+    if not APP_UPDATE_SERVICE_URL:
+        return jsonify({"ok": False, "available": False, "service_reachable": False,
+                        "error": "FjordParcel updater-service er ikke konfigureret."}), 503
+    clean_path = "/" + str(path or "").strip("/")
+    url = f"{APP_UPDATE_SERVICE_URL}{clean_path}"
+    try:
+        body = json.dumps(payload).encode() if payload is not None else None
+        req = urllib.request.Request(url, data=body, method=method.upper())
+        if body:
+            req.add_header("Content-Type", "application/json")
+        with urllib.request.urlopen(req, timeout=float(timeout or APP_UPDATE_SERVICE_TIMEOUT_SEC)) as resp:
+            raw = resp.read().decode("utf-8")
+        try:
+            data = json.loads(raw)
+        except Exception:
+            data = {"ok": False, "error": raw[:500] or "Updater-service svarede ikke med JSON."}
+        if isinstance(data, dict):
+            data.setdefault("service_reachable", True)
+            data.setdefault("updater_url", APP_UPDATE_SERVICE_URL)
+        return jsonify(data), resp.status if hasattr(resp, "status") else 200
+    except urllib.error.HTTPError as e:
+        try:
+            data = json.loads(e.read().decode("utf-8"))
+        except Exception:
+            data = {"ok": False, "error": str(e)}
+        if isinstance(data, dict):
+            data.setdefault("service_reachable", True)
+        return jsonify(data), e.code
+    except Exception as e:
+        return jsonify({"ok": False, "available": False, "service_reachable": False,
+                        "updater_url": APP_UPDATE_SERVICE_URL,
+                        "error": "FjordParcel updater-service er ikke tilgaengelig.",
+                        "detail": str(e)}), 503
+
+
+@app.route("/api/app-update/status", methods=["GET"])
+def api_app_update_status():
+    fb = _require_admin_for_app_update()
+    if fb:
+        return fb
+    return _app_update_proxy("/status", method="GET", timeout=5)
+
+
+@app.route("/api/app-update/check", methods=["POST"])
+def api_app_update_check():
+    fb = _require_admin_for_app_update()
+    if fb:
+        return fb
+    return _app_update_proxy("/check", method="POST", payload={}, timeout=90)
+
+
+@app.route("/api/app-update/start", methods=["POST"])
+def api_app_update_start():
+    fb = _require_admin_for_app_update()
+    if fb:
+        return fb
+    body = request.get_json(silent=True) or {}
+    cleanup = bool(body.get("cleanup", True))
+    return _app_update_proxy("/start", method="POST", payload={"cleanup": cleanup}, timeout=10)
+
+
+@app.route("/api/app-update/settings", methods=["GET", "POST"])
+def api_app_update_settings():
+    fb = _require_admin_for_app_update()
+    if fb:
+        return fb
+    if request.method == "GET":
+        return _app_update_proxy("/settings", method="GET", timeout=5)
+    body = request.get_json(silent=True) or {}
+    payload = {
+        "auto_check_enabled": bool(body.get("auto_check_enabled")),
+        "auto_check_interval_minutes": body.get("auto_check_interval_minutes"),
+    }
+    return _app_update_proxy("/settings", method="POST", payload=payload, timeout=10)
 
 
 if __name__ == "__main__":
