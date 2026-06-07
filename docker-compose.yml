@@ -1,0 +1,12 @@
+services:
+  fjordparcel:
+    build: .
+    container_name: fjordparcel
+    env_file:
+      - .env
+    ports:
+      - "8096:8080"
+    volumes:
+      - ./data:/app/data
+    restart: unless-stopped
+

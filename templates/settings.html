@@ -1,0 +1,478 @@
+{% extends "base.html" %}
+
+{% block content %}
+  <section class="workspace-heading">
+    <div>
+      <p class="eyebrow">Konfiguration</p>
+      <h1>Indstillinger</h1>
+    </div>
+  </section>
+
+  <section class="settings-switch" aria-label="Settings sections" id="tab-bar">
+    <span class="tab-indicator" id="tab-indicator"></span>
+    <a class="settings-switch-item {% if section == 'general' %}active{% endif %}" href="{{ url_for('settings', section='general') }}" data-tab="general">Indstillinger</a>
+    <a class="settings-switch-item {% if section == 'mails' %}active{% endif %}" href="{{ url_for('settings', section='mails') }}" data-tab="mails">Mails</a>
+    <a class="settings-switch-item {% if section == 'carriers' %}active{% endif %}" href="{{ url_for('settings', section='carriers', carrier=active_carrier) }}" data-tab="carriers">Fragtfirmaer</a>
+    <a class="settings-switch-item {% if section == 'users' %}active{% endif %}" href="{{ url_for('settings', section='users') }}" data-tab="users">Brugere</a>
+  </section>
+
+  {# ── General ──────────────────────────────────────────── #}
+  <div id="pane-general" {% if section != 'general' %}hidden{% endif %}>
+    <section class="settings-grid single-panel">
+      <div class="panel">
+        <div class="panel-heading">
+          <h2>Automatisk tracking-opdatering</h2>
+          {% if automation.auto_refresh_enabled %}
+            <span class="badge success">Aktiv</span>
+          {% else %}
+            <span class="badge">Sl&aring;et fra</span>
+          {% endif %}
+        </div>
+        <form class="settings-form" method="post" action="{{ url_for('save_automation_config') }}">
+          <input type="hidden" name="section" value="general">
+          <input type="hidden" name="auto_refresh_present" value="1">
+          <label>
+            <span>Aktiv&eacute;r automatisk tracking-opdatering</span>
+            <input type="checkbox" name="auto_refresh_enabled" {% if automation.auto_refresh_enabled %}checked{% endif %}>
+          </label>
+          <small class="setting-line">Tracking opdateres hvert 30. minut, n&aring;r funktionen er sl&aring;et til.</small>
+          <button type="submit">Gem tracking-automatisering</button>
+        </form>
+      </div>
+    </section>
+  </div>
+
+  {# ── Mails ────────────────────────────────────────────── #}
+  <div id="pane-mails" {% if section != 'mails' %}hidden{% endif %}>
+    {% set selected_provider = active_mail_account.provider if active_mail_account else requested_mail_provider %}
+    <section class="mail-settings-layout">
+      <aside class="panel mail-sidebar">
+        <div class="panel-heading">
+          <h2>Mailkonti</h2>
+          {% if mail_accounts %}
+            <span class="badge success">{{ mail_accounts|length }} forbundet</span>
+          {% elif microsoft_configured or google_configured %}
+            <span class="badge">Klar</span>
+          {% else %}
+            <span class="badge warning">Mangler app</span>
+          {% endif %}
+        </div>
+
+        {% if mail_accounts %}
+          <ul class="mail-account-list">
+            {% for account in mail_accounts %}
+              {% set is_active = active_mail_account and active_mail_account.account_key == account.account_key %}
+              <li>
+                <a class="mail-account-item {% if is_active %}active{% endif %}" href="{{ url_for('settings', section='mails', provider=account.provider, account=account.username) }}">
+                  <span>
+                    <strong>{{ account.username }}</strong>
+                    <small>{{ account.provider_label }} {{ account.method }}</small>
+                  </span>
+                  <span class="mail-account-chevron" aria-hidden="true">&#8594;</span>
+                </a>
+              </li>
+            {% endfor %}
+          </ul>
+        {% else %}
+          <p class="setting-line">Tilf&oslash;j Microsoft- eller Gmail-konti, der skal scannes for pakker.</p>
+        {% endif %}
+
+        <div class="provider-actions">
+          <a class="button-link secondary-button {% if selected_provider == 'microsoft' and setup_provider %}active-light{% endif %}" href="{{ url_for('settings', section='mails', provider='microsoft', setup='1') }}">Konfigur&eacute;r Hotmail</a>
+          <a class="button-link secondary-button {% if selected_provider == 'gmail' and setup_provider %}active-light{% endif %}" href="{{ url_for('settings', section='mails', provider='gmail', setup='1') }}">Konfigur&eacute;r Gmail</a>
+        </div>
+      </aside>
+
+      {% if active_mail_account or setup_provider %}
+        <div class="mail-detail-grid">
+          {% if active_mail_account %}
+            <div class="panel">
+              <div class="panel-heading">
+                <h2>{{ active_mail_account.username }}</h2>
+                <span class="badge success">{{ active_mail_account.provider_label }}</span>
+              </div>
+              <div class="button-row">
+                <form method="post" action="{{ url_for('disconnect_mail_account', provider=active_mail_account.provider, username=active_mail_account.username) }}">
+                  <button class="danger-button" type="submit">Afbryd konto</button>
+                </form>
+              </div>
+              <hr>
+              <div class="group-head">Manuel scanning</div>
+              <form
+                class="scan-form"
+                method="post"
+                action="{{ url_for('scan_mail') }}"
+                data-scan-start-url="{{ url_for('start_scan_mail') }}"
+                data-scan-status-url-template="{{ url_for('scan_mail_status', job_id='__JOB_ID__') }}"
+              >
+                <input type="hidden" name="provider" value="{{ active_mail_account.provider }}">
+                <input type="hidden" name="username" value="{{ active_mail_account.username }}">
+                <label>
+                  <span>Scanperiode</span>
+                  <select name="days">
+                    <option value="7">1 uge (7 dage)</option>
+                    <option value="14" selected>2 uger (14 dage)</option>
+                    <option value="21">3 uger (21 dage)</option>
+                  </select>
+                </label>
+                <button type="submit" {% if not mail_accounts %}disabled{% endif %}>Scan mails</button>
+                <small class="scan-support">DAO, PostNord, Bring, GLS</small>
+                <div class="scan-progress" data-scan-progress hidden>
+                  <div class="scan-progress-header">
+                    <strong data-scan-stage>Klar</strong>
+                    <span data-scan-count>0 scannet</span>
+                  </div>
+                  <div class="progress-track" aria-hidden="true">
+                    <span data-scan-bar style="width: 0%"></span>
+                  </div>
+                  <p data-scan-detail>Venter p&aring; scanning.</p>
+                </div>
+              </form>
+              <div class="group-head">Automatisk mailscan</div>
+              <form class="settings-form" method="post" action="{{ url_for('save_mail_account_automation_config') }}">
+                <input type="hidden" name="provider" value="{{ active_mail_account.provider }}">
+                <input type="hidden" name="username" value="{{ active_mail_account.username }}">
+                <label>
+                  <span>Aktiv&eacute;r automatisk mailscan</span>
+                  <input type="checkbox" name="auto_scan_enabled" {% if account_automation.auto_scan_enabled %}checked{% endif %}>
+                </label>
+                <label>
+                  <span>Scan-interval (minutter)</span>
+                  <input name="auto_scan_minutes" inputmode="numeric" autocomplete="off" value="{{ account_automation.auto_scan_minutes }}" placeholder="30">
+                </label>
+                <button type="submit">Gem mail-automatisering</button>
+              </form>
+            </div>
+          {% else %}
+            <div class="panel mail-empty-detail">
+              {% if selected_provider == 'gmail' %}
+                <h2>Gmail ops&aelig;tning</h2>
+                <p>Opret en Google OAuth-klient, gem klientoplysningerne her, og forbind derefter Gmail.</p>
+                <div class="connect-action">
+                  {% if google_configured %}
+                    <a class="button-link" href="{{ url_for('google_mail_connect') }}">Forbind Gmail-konto</a>
+                    <small>Den gemte Google app-registrering bruges til alle Gmail-konti. Hver mailkonto gemmes separat.</small>
+                  {% else %}
+                    <span class="button-link disabled" aria-disabled="true">Forbind Gmail-konto</span>
+                    <small>Gem Google app-registreringen f&oslash;r knappen bliver aktiv.</small>
+                  {% endif %}
+                </div>
+              {% else %}
+                <h2>Microsoft ops&aelig;tning</h2>
+                <p>Opret en Microsoft app-registrering, gem klientoplysningerne her, og forbind derefter Hotmail.</p>
+                <div class="connect-action">
+                  {% if microsoft_configured %}
+                    <a class="button-link" href="{{ url_for('microsoft_mail_connect') }}">Forbind Hotmail-konto</a>
+                    <small>Den gemte Microsoft app-registrering bruges til alle Hotmail-konti. Hver mailkonto gemmes separat.</small>
+                  {% else %}
+                    <span class="button-link disabled" aria-disabled="true">Forbind Hotmail-konto</span>
+                    <small>Gem Microsoft app-registreringen f&oslash;r knappen bliver aktiv.</small>
+                  {% endif %}
+                </div>
+              {% endif %}
+            </div>
+          {% endif %}
+
+          <div class="panel">
+            <div class="panel-heading">
+              <h2>{% if selected_provider == 'gmail' %}Google app-registrering{% else %}Microsoft app-registrering{% endif %}</h2>
+            </div>
+            {% if selected_provider == 'gmail' %}
+              {% if google_configured and not edit_app_registration %}
+                <div class="app-registration-status">
+                  <strong>Google app-registrering er gemt</strong>
+                  <p>Den bruges kun til at starte OAuth-login. Gmail-konti og tokens gemmes separat pr. mailkonto.</p>
+                  <a class="button-link secondary-button" href="{{ url_for('settings', section='mails', provider='gmail', setup='1', edit_app='1') }}">Rediger app-registrering</a>
+                </div>
+              {% else %}
+                <form class="settings-form" method="post" action="{{ url_for('save_google_config') }}">
+                  <label>
+                    <span>Klient-ID</span>
+                    <input name="client_id" autocomplete="off" value="{{ google_config.client_id if edit_app_registration else '' }}" placeholder="OAuth client ID">
+                  </label>
+                  <label>
+                    <span>Klienthemmelighed</span>
+                    <input name="client_secret" type="password" autocomplete="off" placeholder="{% if google_config.client_secret and edit_app_registration %}Lad v&aelig;re tom for at beholde gemt hemmelighed{% else %}V&aelig;rdi af klienthemmelighed{% endif %}">
+                  </label>
+                  <label>
+                    <span>Maks. mails pr. scanning</span>
+                    <input name="max_scan_messages" inputmode="numeric" autocomplete="off" value="{{ google_config.max_scan_messages }}" placeholder="1000">
+                  </label>
+                  <div class="button-row">
+                    <button type="submit">Gem Google-indstillinger</button>
+                    {% if google_configured %}
+                      <a class="secondary-action" href="{{ url_for('settings', section='mails', provider='gmail', setup='1') }}">Annuller</a>
+                    {% endif %}
+                  </div>
+                </form>
+              {% endif %}
+              <dl class="config-list">
+                <div><dt>Omdirigerings-URI</dt><dd><code>{{ google_redirect_uri }}</code></dd></div>
+                <div><dt>Client ID</dt><dd>{{ "Gemt krypteret" if google_config.client_id else "Mangler" }}</dd></div>
+                <div><dt>Client secret</dt><dd>{{ "Gemt krypteret" if google_config.client_secret else "Mangler" }}</dd></div>
+                <div><dt>Gmail API scope</dt><dd><code>https://www.googleapis.com/auth/gmail.readonly</code></dd></div>
+              </dl>
+            {% else %}
+              {% if microsoft_configured and not edit_app_registration %}
+                <div class="app-registration-status">
+                  <strong>Microsoft app-registrering er gemt</strong>
+                  <p>Den bruges kun til at starte OAuth-login. Hotmail-konti og tokens gemmes separat pr. mailkonto.</p>
+                  <a class="button-link secondary-button" href="{{ url_for('settings', section='mails', provider='microsoft', setup='1', edit_app='1') }}">Rediger app-registrering</a>
+                </div>
+              {% else %}
+                <form class="settings-form" method="post" action="{{ url_for('save_microsoft_config') }}">
+                  <label>
+                    <span>Klient-ID</span>
+                    <input name="client_id" autocomplete="off" value="{{ microsoft_config.client_id if edit_app_registration else '' }}" placeholder="Application (client) ID">
+                  </label>
+                  <label>
+                    <span>Klienthemmelighed</span>
+                    <input name="client_secret" type="password" autocomplete="off" placeholder="{% if microsoft_config.client_secret and edit_app_registration %}Lad v&aelig;re tom for at beholde gemt hemmelighed{% else %}V&aelig;rdi af klienthemmelighed{% endif %}">
+                  </label>
+                  <label>
+                    <span>Lejer (tenant)</span>
+                    <input name="tenant" autocomplete="off" value="{{ microsoft_config.tenant }}" placeholder="consumers">
+                  </label>
+                  <div class="split-fields">
+                    <label>
+                      <span>IMAP-v&aelig;rt</span>
+                      <input name="imap_host" autocomplete="off" value="{{ microsoft_config.imap_host }}" placeholder="outlook.office365.com">
+                    </label>
+                    <label>
+                      <span>IMAP-port</span>
+                      <input name="imap_port" inputmode="numeric" autocomplete="off" value="{{ microsoft_config.imap_port }}" placeholder="993">
+                    </label>
+                  </div>
+                  <label>
+                    <span>Maks. mails pr. scanning</span>
+                    <input name="max_scan_messages" inputmode="numeric" autocomplete="off" value="{{ microsoft_config.max_scan_messages }}" placeholder="1000">
+                  </label>
+                  <div class="button-row">
+                    <button type="submit">Gem Microsoft-indstillinger</button>
+                    {% if microsoft_configured %}
+                      <a class="secondary-action" href="{{ url_for('settings', section='mails', provider='microsoft', setup='1') }}">Annuller</a>
+                    {% endif %}
+                  </div>
+                </form>
+              {% endif %}
+              <dl class="config-list">
+                <div><dt>Omdirigerings-URI</dt><dd><code>{{ redirect_uri }}</code></dd></div>
+                <div><dt>Client ID</dt><dd>{{ "Gemt krypteret" if microsoft_config.client_id else "Mangler" }}</dd></div>
+                <div><dt>Client secret</dt><dd>{{ "Gemt krypteret" if microsoft_config.client_secret else "Mangler" }}</dd></div>
+                <div><dt>IMAP-server</dt><dd><code>{{ microsoft_config.imap_host }}:{{ microsoft_config.imap_port }}</code></dd></div>
+                <div><dt>OAuth-scope</dt><dd><code>https://outlook.office.com/IMAP.AccessAsUser.All</code></dd></div>
+              </dl>
+            {% endif %}
+          </div>
+        </div>
+      {% elif mail_accounts %}
+        <div class="panel mail-empty-detail">
+          <h2>V&aelig;lg en mailkonto</h2>
+          <p>V&aelig;lg en konto i listen for at se scanning, automatisering og app-indstillinger.</p>
+        </div>
+      {% else %}
+        <div class="panel mail-empty-detail">
+          <h2>Ingen mailkonti endnu</h2>
+          <p>V&aelig;lg Microsoft eller Gmail i menuen til venstre for at komme i gang.</p>
+        </div>
+      {% endif %}
+    </section>
+  </div>
+
+  {# ── Carriers ─────────────────────────────────────────── #}
+  <div id="pane-carriers" {% if section != 'carriers' %}hidden{% endif %}>
+    <section class="carrier-settings-layout">
+      <aside class="panel carrier-panel">
+        <div class="panel-heading">
+          <h2>Fragtfirmaer</h2>
+        </div>
+        <nav class="carrier-list" aria-label="Carrier list">
+          {% for carrier_name in carrier_names %}
+            <a
+              class="carrier-item {% if active_carrier == carrier_name %}active{% endif %}"
+              href="{{ url_for('settings', section='carriers', carrier=carrier_name) }}"
+            >
+              <strong>{{ carrier_name }}</strong>
+              <small>{{ postal_counts.get(carrier_name, 0) }} postnumre</small>
+            </a>
+          {% endfor %}
+        </nav>
+      </aside>
+
+      <div class="panel">
+        <div class="panel-heading">
+          <h2>{{ active_carrier }} indstillinger</h2>
+          {% if active_carrier == 'GLS' %}
+            <span class="badge success">Aktiv for h&aelig;ndelser</span>
+          {% else %}
+            <span class="badge">Klar til senere</span>
+          {% endif %}
+        </div>
+        <p class="setting-line">
+          Gem de postnumre du typisk bruger til {{ active_carrier }}.
+          {% if active_carrier == 'GLS' %}
+            Ved GLS-opdatering pr&oslash;ver FjordParcel disse postnumre for at hente detaljerede h&aelig;ndelser.
+          {% else %}
+            Disse postnumre bruges ikke aktivt endnu, men er klar til n&aelig;ste provider-opslag.
+          {% endif %}
+        </p>
+        <form class="postcode-add-form" method="post" action="{{ url_for('add_carrier_postal_code', carrier=active_carrier) }}">
+          <label>
+            <span>Tilf&oslash;j postnummer</span>
+            <input name="postal_code" autocomplete="off" placeholder="F.eks. 9000" required>
+          </label>
+          <button type="submit">Gem postnummer</button>
+        </form>
+        {% if selected_postcodes %}
+          <ul class="postcode-list">
+            {% for postal_code in selected_postcodes %}
+              <li>
+                <code>{{ postal_code }}</code>
+                <form method="post" action="{{ url_for('remove_carrier_postal_code_entry', carrier=active_carrier) }}">
+                  <input type="hidden" name="postal_code" value="{{ postal_code }}">
+                  <button class="danger-button small-button" type="submit">Fjern</button>
+                </form>
+              </li>
+            {% endfor %}
+          </ul>
+        {% else %}
+          <div class="setup-note">
+            <h3>Ingen postnumre endnu</h3>
+            <p>Tilf&oslash;j mindst et postnummer for at forbedre h&aelig;ndelsesopslag.</p>
+          </div>
+        {% endif %}
+      </div>
+    </section>
+  </div>
+
+  {# ── Users ────────────────────────────────────────────── #}
+  <div id="pane-users" {% if section != 'users' %}hidden{% endif %}>
+    <section class="settings-grid single-panel">
+      <div class="panel">
+        <div class="panel-heading">
+          <h2>Brugere</h2>
+          <span class="badge success">{{ users|length }} bruger{{ 'e' if users|length != 1 else '' }}</span>
+        </div>
+        <table class="user-table">
+          <thead>
+            <tr>
+              <th>Navn</th>
+              <th>Brugernavn</th>
+              <th>Rolle</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for user in users %}
+              <tr>
+                <td>{{ user.name }}</td>
+                <td><code>{{ user.username }}</code></td>
+                <td>
+                  <span class="badge {% if user.role == 'admin' %}success{% endif %}">
+                    {{ 'Admin' if user.role == 'admin' else 'Bruger' }}
+                  </span>
+                </td>
+                <td class="user-actions">
+                  <form method="post" action="{{ url_for('delete_user_settings', user_id=user.id) }}" onsubmit="return confirm('Slet {{ user.name }}?')">
+                    <button class="danger-button small-button" type="submit">Slet</button>
+                  </form>
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+        <div class="button-row" style="margin-top:18px">
+          <button type="button" class="button-link" onclick="document.getElementById('create-user-modal').showModal()">Opret bruger</button>
+        </div>
+      </div>
+    </section>
+
+    <dialog id="create-user-modal" class="user-modal">
+      <div class="user-modal-inner">
+        <div class="user-modal-head">
+          <h2>Opret bruger</h2>
+          <button type="button" class="modal-close" onclick="document.getElementById('create-user-modal').close()" aria-label="Luk">&times;</button>
+        </div>
+        <form method="post" action="{{ url_for('create_user_settings') }}" class="auth-form" autocomplete="off">
+          <div class="auth-field">
+            <label for="cu-name">Navn</label>
+            <input id="cu-name" name="name" type="text" required placeholder="Fulde navn">
+          </div>
+          <div class="auth-field">
+            <label for="cu-username">Brugernavn</label>
+            <input id="cu-username" name="username" type="text" required placeholder="fx bruger1">
+          </div>
+          <div class="auth-field">
+            <label for="cu-password">Adgangskode</label>
+            <input id="cu-password" name="password" type="password" required placeholder="Mindst 6 tegn">
+          </div>
+          <div class="auth-field">
+            <label for="cu-password2">Gentag adgangskode</label>
+            <input id="cu-password2" name="password2" type="password" required placeholder="Gentag adgangskoden">
+          </div>
+          <div class="auth-field">
+            <label for="cu-role">Rolle</label>
+            <select id="cu-role" name="role">
+              <option value="admin">Admin – fuld adgang</option>
+              <option value="user" selected>Bruger – ingen adgang til indstillinger</option>
+            </select>
+          </div>
+          <div class="button-row" style="margin-top:6px">
+            <button type="submit">Opret bruger</button>
+            <button type="button" class="button-link secondary-button" onclick="document.getElementById('create-user-modal').close()">Annuller</button>
+          </div>
+        </form>
+      </div>
+    </dialog>
+  </div>
+
+  <script>
+    (function () {
+      var bar = document.getElementById('tab-bar');
+      var indicator = document.getElementById('tab-indicator');
+      var items = Array.from(bar.querySelectorAll('.settings-switch-item'));
+      var active = bar.querySelector('.settings-switch-item.active');
+      if (!active) return;
+
+      function getPos(el) {
+        var barRect = bar.getBoundingClientRect();
+        var elRect = el.getBoundingClientRect();
+        return { x: elRect.left - barRect.left - 6, w: elRect.width };
+      }
+
+      function setIndicator(el, animate) {
+        var pos = getPos(el);
+        if (!animate) indicator.style.transition = 'none';
+        indicator.style.width = pos.w + 'px';
+        indicator.style.transform = 'translateX(' + pos.x + 'px)';
+        if (!animate) requestAnimationFrame(function () { indicator.style.transition = ''; });
+      }
+
+      setIndicator(active, false);
+
+      items.forEach(function (item) {
+        item.addEventListener('click', function (e) {
+          var tab = item.getAttribute('data-tab');
+          var pane = document.getElementById('pane-' + tab);
+          if (!pane) return; // fall through to normal navigation
+
+          e.preventDefault();
+
+          // Animate indicator
+          setIndicator(item, true);
+
+          // Update active class
+          items.forEach(function (i) { i.classList.remove('active'); });
+          item.classList.add('active');
+
+          // Show/hide panes instantly
+          document.querySelectorAll('[id^="pane-"]').forEach(function (p) { p.hidden = true; });
+          pane.hidden = false;
+
+          // Update URL without page reload
+          history.pushState(null, '', item.getAttribute('href'));
+        });
+      });
+    })();
+  </script>
+{% endblock %}
