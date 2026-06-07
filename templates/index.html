@@ -27,7 +27,7 @@
         {% if shipment.is_hidden %}
           <span class="archive-pill hidden-pill">Skjult</span>
         {% endif %}
-        <form class="rename-form" method="post" action="{{ url_for('rename_shipment', shipment_id=shipment.id) }}" hidden>
+        <form class="rename-form" method="post" action="{{ url_for('rename_shipment', shipment_id=shipment.id) }}" accept-charset="UTF-8" hidden>
           {{ archive_state_input(show_archived) }}
           <input name="label" autocomplete="off" value="{{ shipment.label or '' }}" placeholder="Pakkenavn">
           <button type="submit">Gem</button>
@@ -61,32 +61,32 @@
       <div class="muted-text">{{ shipment.last_seen_at|dmy }}</div>
       <div class="row-actions">
         {% if shipment.is_archived %}
-          <form method="post" action="{{ url_for('restore_shipment', shipment_id=shipment.id) }}">
+          <form method="post" action="{{ url_for('restore_shipment', shipment_id=shipment.id) }}" accept-charset="UTF-8">
             {{ archive_state_input(show_archived) }}
             <button class="icon-button restore-button" type="submit" title="Gendan" aria-label="Gendan {{ shipment.tracking_number }}">&#8593;</button>
           </form>
         {% else %}
-          <form method="post" action="{{ url_for('archive_shipment', shipment_id=shipment.id) }}">
+          <form method="post" action="{{ url_for('archive_shipment', shipment_id=shipment.id) }}" accept-charset="UTF-8">
             {{ archive_state_input(show_archived) }}
             <button class="icon-button archive-button" type="submit" title="Arkiver" aria-label="Arkiver {{ shipment.tracking_number }}">&#8595;</button>
           </form>
         {% endif %}
-        <form method="post" action="{{ url_for('refresh_shipment', shipment_id=shipment.id) }}">
+        <form method="post" action="{{ url_for('refresh_shipment', shipment_id=shipment.id) }}" accept-charset="UTF-8">
           {{ archive_state_input(show_archived) }}
           <button class="icon-button" type="submit" title="Opdater" aria-label="Opdater {{ shipment.tracking_number }}">&#8635;</button>
         </form>
         {% if shipment.is_hidden %}
-          <form method="post" action="{{ url_for('unhide_shipment', shipment_id=shipment.id) }}">
+          <form method="post" action="{{ url_for('unhide_shipment', shipment_id=shipment.id) }}" accept-charset="UTF-8">
             {{ archive_state_input(show_archived) }}
             <button class="icon-button hide-button is-hidden" type="submit" title="Vis for alle" aria-label="Vis {{ shipment.tracking_number }} for alle"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg></button>
           </form>
         {% else %}
-          <form method="post" action="{{ url_for('hide_shipment', shipment_id=shipment.id) }}">
+          <form method="post" action="{{ url_for('hide_shipment', shipment_id=shipment.id) }}" accept-charset="UTF-8">
             {{ archive_state_input(show_archived) }}
             <button class="icon-button hide-button" type="submit" title="Skjul for andre" aria-label="Skjul {{ shipment.tracking_number }} for andre"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 9.9-1"></path></svg></button>
           </form>
         {% endif %}
-        <form method="post" action="{{ url_for('remove_shipment', shipment_id=shipment.id) }}">
+        <form method="post" action="{{ url_for('remove_shipment', shipment_id=shipment.id) }}" accept-charset="UTF-8">
           {{ archive_state_input(show_archived) }}
           <button class="icon-button danger" type="submit" title="Slet" aria-label="Slet {{ shipment.tracking_number }}">&times;</button>
         </form>
@@ -159,7 +159,7 @@
   </section>
 
   <section class="toolbar">
-    <form class="add-form" method="post" action="{{ url_for('create_shipment') }}">
+    <form class="add-form" method="post" action="{{ url_for('create_shipment') }}" accept-charset="UTF-8">
       <label>
         <span>Trackingnummer</span>
         <input name="tracking_number" autocomplete="off" placeholder="1Z999AA10123456784" required>

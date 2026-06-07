@@ -29,7 +29,7 @@
             <span class="badge">Sl&aring;et fra</span>
           {% endif %}
         </div>
-        <form class="settings-form" method="post" action="{{ url_for('save_automation_config') }}">
+        <form class="settings-form" method="post" action="{{ url_for('save_automation_config') }}" accept-charset="UTF-8">
           <input type="hidden" name="section" value="general">
           <input type="hidden" name="auto_refresh_present" value="1">
           <label>
@@ -93,13 +93,13 @@
                 <span class="badge success">{{ active_mail_account.provider_label }}</span>
               </div>
               <div class="button-row">
-                <form method="post" action="{{ url_for('disconnect_mail_account', provider=active_mail_account.provider, username=active_mail_account.username) }}">
+                <form method="post" action="{{ url_for('disconnect_mail_account', provider=active_mail_account.provider, username=active_mail_account.username) }}" accept-charset="UTF-8">
                   <button class="danger-button" type="submit">Afbryd konto</button>
                 </form>
               </div>
               <hr>
               <div class="group-head">Manuel scanning</div>
-              <form
+              <form accept-charset="UTF-8"
                 class="scan-form"
                 method="post"
                 action="{{ url_for('scan_mail') }}"
@@ -130,7 +130,7 @@
                 </div>
               </form>
               <div class="group-head">Automatisk mailscan</div>
-              <form class="settings-form" method="post" action="{{ url_for('save_mail_account_automation_config') }}">
+              <form class="settings-form" method="post" action="{{ url_for('save_mail_account_automation_config') }}" accept-charset="UTF-8">
                 <input type="hidden" name="provider" value="{{ active_mail_account.provider }}">
                 <input type="hidden" name="username" value="{{ active_mail_account.username }}">
                 <label>
@@ -186,7 +186,7 @@
                   <a class="button-link secondary-button" href="{{ url_for('settings', section='mails', provider='gmail', setup='1', edit_app='1') }}">Rediger app-registrering</a>
                 </div>
               {% else %}
-                <form class="settings-form" method="post" action="{{ url_for('save_google_config') }}">
+                <form class="settings-form" method="post" action="{{ url_for('save_google_config') }}" accept-charset="UTF-8">
                   <label>
                     <span>Klient-ID</span>
                     <input name="client_id" autocomplete="off" value="{{ google_config.client_id if edit_app_registration else '' }}" placeholder="OAuth client ID">
@@ -240,7 +240,7 @@
                   <a class="button-link secondary-button" href="{{ url_for('settings', section='mails', provider='microsoft', setup='1', edit_app='1') }}">Rediger app-registrering</a>
                 </div>
               {% else %}
-                <form class="settings-form" method="post" action="{{ url_for('save_microsoft_config') }}">
+                <form class="settings-form" method="post" action="{{ url_for('save_microsoft_config') }}" accept-charset="UTF-8">
                   <label>
                     <span>Klient-ID</span>
                     <input name="client_id" autocomplete="off" value="{{ microsoft_config.client_id if edit_app_registration else '' }}" placeholder="Application (client) ID">
@@ -355,7 +355,7 @@
             Disse postnumre bruges ikke aktivt endnu, men er klar til n&aelig;ste provider-opslag.
           {% endif %}
         </p>
-        <form class="postcode-add-form" method="post" action="{{ url_for('add_carrier_postal_code', carrier=active_carrier) }}">
+        <form class="postcode-add-form" method="post" action="{{ url_for('add_carrier_postal_code', carrier=active_carrier) }}" accept-charset="UTF-8">
           <label>
             <span>Tilf&oslash;j postnummer</span>
             <input name="postal_code" autocomplete="off" placeholder="F.eks. 9000" required>
@@ -367,7 +367,7 @@
             {% for postal_code in selected_postcodes %}
               <li>
                 <code>{{ postal_code }}</code>
-                <form method="post" action="{{ url_for('remove_carrier_postal_code_entry', carrier=active_carrier) }}">
+                <form method="post" action="{{ url_for('remove_carrier_postal_code_entry', carrier=active_carrier) }}" accept-charset="UTF-8">
                   <input type="hidden" name="postal_code" value="{{ postal_code }}">
                   <button class="danger-button small-button" type="submit">Fjern</button>
                 </form>
@@ -412,7 +412,7 @@
                   </span>
                 </td>
                 <td class="user-actions">
-                  <form method="post" action="{{ url_for('delete_user_settings', user_id=user.id) }}" onsubmit="return confirm('Slet {{ user.name }}?')">
+                  <form method="post" action="{{ url_for('delete_user_settings', user_id=user.id) }}" accept-charset="UTF-8" onsubmit="return confirm('Slet {{ user.name }}?')">
                     <button class="danger-button small-button" type="submit">Slet</button>
                   </form>
                 </td>
@@ -432,7 +432,7 @@
           <h2>Opret bruger</h2>
           <button type="button" class="modal-close" onclick="document.getElementById('create-user-modal').close()" aria-label="Luk">&times;</button>
         </div>
-        <form method="post" action="{{ url_for('create_user_settings') }}" class="auth-form" autocomplete="off">
+        <form method="post" action="{{ url_for('create_user_settings') }}" class="auth-form" autocomplete="off" accept-charset="UTF-8">
           <div class="auth-field">
             <label for="cu-name">Navn</label>
             <input id="cu-name" name="name" type="text" required placeholder="Fulde navn">

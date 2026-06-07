@@ -31,7 +31,7 @@
           <a href="{{ url_for('settings') }}">Indstillinger</a>
         {% endif %}
         {% if current_user_name %}
-          <form method="post" action="{{ url_for('logout') }}" style="margin:0">
+          <form method="post" action="{{ url_for('logout') }}" style="margin:0" accept-charset="UTF-8">
             <button type="submit" class="nav-logout" title="Log ud som {{ current_user_name }}">Log ud</button>
           </form>
         {% endif %}

@@ -207,6 +207,15 @@ def test_extracts_dao_sender_label_without_zero_width_spaces():
     assert extract_dao_mail_label(text) == "bent Felv\u00f8"
 
 
+def test_extracts_danish_letters_from_mail_text():
+    dao_text = "Søren Æblegård har netop indleveret en pakke som nu er på vej til dig. Pakkenr.: 00057151273676436276"
+    postnord_text = "Din pakke fra Ærø Købmand er klar til afhentning i Pakkeshop 7-Eleven, Åvej 12, 4700 Næstved. Hent senest den 18.5."
+
+    assert extract_dao_mail_label(dao_text) == "Søren Æblegård"
+    assert extract_postnord_mail_label(postnord_text) == "Ærø Købmand"
+    assert extract_pickup_location(postnord_text, "PostNord") == "7-Eleven, Åvej 12, 4700 Næstved"
+
+
 def test_extracts_dao_sender_label_from_ready_mail():
     text = "Din pakke 00057151273676436276 fra bent Felvoe er klar til afhentning hos 7-Eleven."
 

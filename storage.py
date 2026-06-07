@@ -2,6 +2,7 @@ import json
 import os
 import re
 import sqlite3
+import unicodedata
 from datetime import datetime, timedelta, timezone
 
 from tracking import (
@@ -21,6 +22,23 @@ from tracking_providers import TrackingLookupResult, fetch_tracking
 DATABASE_PATH = os.getenv("DATABASE_PATH", os.path.join("data", "fjordparcel.db"))
 SUPPORTED_CARRIER_SETTINGS = tuple(SUPPORTED_SCAN_CARRIERS)
 DELIVERED_ARCHIVE_AFTER = timedelta(hours=24)
+
+
+def normalize_text(value, max_length=None):
+    text = unicodedata.normalize("NFC", str(value or ""))
+    text = re.sub(r"[\u200b\u200c\u200d\ufeff]+", "", text)
+    text = re.sub(r"\s+", " ", text).strip()
+    if max_length is not None:
+        text = text[: int(max_length)]
+    return text
+
+
+def normalize_optional_text(value, max_length=None):
+    return normalize_text(value, max_length=max_length) or None
+
+
+def normalize_key_text(value):
+    return normalize_text(value).casefold()
 
 
 def _as_utc(value):
@@ -616,6 +634,9 @@ def add_shipment(
     if not number:
         raise ValueError("Tracking number is required.")
 
+    label = normalize_optional_text(label, max_length=120)
+    mail_subject = normalize_optional_text(mail_subject, max_length=500)
+    mail_from = normalize_optional_text(mail_from, max_length=320)
     now = utc_now()
     carrier_name = carrier or detect_carrier(number, " ".join(filter(None, [mail_subject, mail_from])))
     tracking_url = build_tracking_url(number, carrier_name)
@@ -714,7 +735,7 @@ def delete_shipment(shipment_id):
 
 
 def update_shipment_label(shipment_id, label):
-    next_label = (label or "").strip()[:120] or None
+    next_label = normalize_optional_text(label, max_length=120)
     next_label_source = "manual" if next_label else ""
     with get_connection() as db:
         db.execute(
@@ -728,7 +749,7 @@ def update_shipment_label(shipment_id, label):
 
 
 def update_shipment_auto_label(shipment_id, label):
-    next_label = (label or "").strip()[:120] or None
+    next_label = normalize_optional_text(label, max_length=120)
     if not next_label:
         return get_shipment(shipment_id)
 
@@ -746,9 +767,9 @@ def update_shipment_auto_label(shipment_id, label):
 
 
 def update_shipment_mail_status(shipment_id, status, last_event_text=None, last_event_at=None):
-    next_status = str(status or "").strip() or "Saved"
-    next_event_text = str(last_event_text or next_status).strip()
-    next_event_at = str(last_event_at or utc_now()).strip()
+    next_status = normalize_text(status, max_length=160) or "Saved"
+    next_event_text = normalize_text(last_event_text or next_status, max_length=500)
+    next_event_at = normalize_text(last_event_at or utc_now(), max_length=80)
     now = utc_now()
 
     with get_connection() as db:
@@ -885,9 +906,9 @@ def refresh_shipment_tracking(shipment_id):
         result = _tracking_error_result(shipment, error)
 
     now = utc_now()
-    status = str(result.status or shipment.get("status") or "Saved")
-    tracking_url = str(result.tracking_url or shipment.get("tracking_url") or build_tracking_url(number, carrier))
-    tracking_reference = str(result.reference_number or shipment.get("tracking_reference") or "")
+    status = normalize_text(result.status or shipment.get("status") or "Saved", max_length=160) or "Saved"
+    tracking_url = normalize_text(result.tracking_url or shipment.get("tracking_url") or build_tracking_url(number, carrier), max_length=500)
+    tracking_reference = normalize_text(result.reference_number or shipment.get("tracking_reference") or "", max_length=120)
     events_json = json.dumps((result.events or [])[:30], ensure_ascii=False)
     delivered_at = _delivery_fields_for_result(shipment, result, status, now)
 
@@ -915,16 +936,16 @@ def refresh_shipment_tracking(shipment_id):
             """,
             (
                 status,
-                str(result.status_code or ""),
-                str(result.summary or ""),
-                str(result.last_event_at or ""),
-                str(result.last_event_text or ""),
-                str(result.last_event_location or ""),
+                normalize_text(result.status_code, max_length=120),
+                normalize_text(result.summary, max_length=500),
+                normalize_text(result.last_event_at, max_length=80),
+                normalize_text(result.last_event_text, max_length=500),
+                normalize_text(result.last_event_location, max_length=220),
                 events_json,
                 tracking_url,
                 tracking_reference,
-                str(result.source or ""),
-                str(result.error or ""),
+                normalize_text(result.source, max_length=120),
+                normalize_text(result.error, max_length=260),
                 delivered_at,
                 now,
                 now,
@@ -957,7 +978,7 @@ def record_scan_run(source, messages_scanned, tracking_numbers_found, new_shipme
 
 def _normalize_mail_account_key(provider, username):
     provider_key = str(provider or "").strip().lower()
-    username_key = str(username or "").strip().lower()
+    username_key = normalize_key_text(username)
     if provider_key not in {"microsoft", "gmail"}:
         raise ValueError("Mail provider is not supported.")
     if not username_key:
@@ -1075,10 +1096,12 @@ def has_any_user():
 
 def create_user(name, username, password_hash, role="admin"):
     now = utc_now()
+    display_name = normalize_text(name, max_length=120)
+    username_key = normalize_key_text(username)
     with get_connection() as db:
         db.execute(
             "INSERT INTO users (name, username, password_hash, role, created_at) VALUES (?, ?, ?, ?, ?)",
-            (name.strip(), username.strip().lower(), password_hash, role, now),
+            (display_name, username_key, password_hash, role, now),
         )
 
 
@@ -1086,7 +1109,7 @@ def get_user_by_username(username):
     with get_connection() as db:
         return db.execute(
             "SELECT * FROM users WHERE username = ?",
-            (username.strip().lower(),),
+            (normalize_key_text(username),),
         ).fetchone()
 
 

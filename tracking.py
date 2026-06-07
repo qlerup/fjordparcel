@@ -1,5 +1,6 @@
 import html
 import re
+import unicodedata
 from urllib.parse import quote_plus, unquote_plus
 
 
@@ -100,7 +101,7 @@ def normalize_gls_reference(value):
 
 
 def _plain_text(value):
-    text = html.unescape(str(value or ""))
+    text = unicodedata.normalize("NFC", html.unescape(str(value or "")))
     text = re.sub(r"<[^>]+>", " ", text)
     return re.sub(r"[ \t\r\f\v]+", " ", text)
 
@@ -215,7 +216,8 @@ def extract_gls_mail_label(text):
 
 
 def _clean_mail_label(value):
-    label = re.sub(r"[\u200b\u200c\u200d\ufeff]+", "", str(value or ""))
+    label = unicodedata.normalize("NFC", str(value or ""))
+    label = re.sub(r"[\u200b\u200c\u200d\ufeff]+", "", label)
     label = re.sub(r"\s+", " ", label)
     label = re.sub(r"^[\s.,:;-]+|[\s.,:;-]+$", "", label)
     return label[:120] or None

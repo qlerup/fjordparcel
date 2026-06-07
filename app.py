@@ -80,6 +80,7 @@ from tracking import (
 
 app = Flask(__name__)
 app.config["SECRET_KEY"] = os.getenv("SECRET_KEY", "fjordparcel-dev-secret")
+app.json.ensure_ascii = False
 APP_BUILD = os.getenv("APP_BUILD", str(int(os.path.getmtime(__file__))))
 
 APP_UPDATE_SERVICE_URL = str(os.environ.get("FJORDPARCEL_UPDATER_URL", "http://fjordparcel-updater:8090") or "").strip().rstrip("/")

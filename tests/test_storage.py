@@ -18,6 +18,41 @@ def test_update_shipment_label(tmp_path, monkeypatch):
     assert cleared["label"] is None
 
 
+def test_user_text_fields_keep_danish_characters(tmp_path, monkeypatch):
+    monkeypatch.setattr(storage, "DATABASE_PATH", str(tmp_path / "fjordparcel.db"))
+    storage.init_db()
+
+    _created, shipment = storage.add_shipment(
+        "370722152477343049",
+        label="  Æblekasse fra Øko Årstid  ",
+        source="mail",
+        carrier="Bring",
+        mail_subject="Din pakke fra Ærø Købmand er på vej",
+        mail_from="Søren Ågård <shop@example.com>",
+        pickup_location="Nærboks ved Åvej, 4700 Næstved",
+    )
+
+    assert shipment["label"] == "Æblekasse fra Øko Årstid"
+    assert shipment["mail_subject"] == "Din pakke fra Ærø Købmand er på vej"
+    assert shipment["mail_from"] == "Søren Ågård <shop@example.com>"
+    assert shipment["pickup_location"] == "Nærboks ved Åvej, 4700 Næstved"
+
+    storage.update_shipment_label(shipment["id"], "  Åben æske fra Østerbro  ")
+    assert storage.get_shipment(shipment["id"])["label"] == "Åben æske fra Østerbro"
+
+
+def test_users_keep_danish_name_and_username(tmp_path, monkeypatch):
+    monkeypatch.setattr(storage, "DATABASE_PATH", str(tmp_path / "fjordparcel.db"))
+    storage.init_db()
+
+    storage.create_user("  Åse Østergaard  ", "SØREN", "hash", role="admin")
+
+    user = storage.get_user_by_username("søren")
+    assert user["name"] == "Åse Østergaard"
+    assert user["username"] == "søren"
+    assert storage.get_user_by_username("SØREN")["id"] == user["id"]
+
+
 def test_mail_received_at_is_saved_with_shipment(tmp_path, monkeypatch):
     monkeypatch.setattr(storage, "DATABASE_PATH", str(tmp_path / "fjordparcel.db"))
     storage.init_db()
