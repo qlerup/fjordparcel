@@ -211,14 +211,20 @@
                 <div>
                   <dt class="redirect-uri-dt">
                     <span>Omdirigerings-URI</span>
-                    <button type="button" class="archive-switch redirect-uri-toggle is-on" data-redirect-toggle="google" aria-label="Brug eget domæne" aria-pressed="true">
-                      <span>Brug eget domæne</span>
+                    <button type="button" class="archive-switch redirect-uri-toggle is-on" data-redirect-toggle="google" aria-pressed="true">
+                      <span>Brug localhost</span>
                       <span class="archive-switch-track" aria-hidden="true"><span class="archive-switch-thumb"></span></span>
                     </button>
                   </dt>
                   <dd>
-                    <code data-redirect-domain="google" hidden>{{ google_redirect_uri }}</code>
                     <code data-redirect-localhost="google">{{ localhost_google_redirect_uri }}</code>
+                    <div data-redirect-domain="google" hidden class="redirect-domain-edit">
+                      <div class="redirect-domain-row">
+                        <input type="text" class="redirect-domain-input" data-domain-input="google" data-callback-path="/auth/google/callback" placeholder="https://dit-domæne.dk">
+                        <button type="button" class="redirect-copy-btn" data-domain-copy="google" title="Kopiér redirect-URI"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg></button>
+                      </div>
+                      <code data-domain-preview="google" hidden class="redirect-domain-preview"></code>
+                    </div>
                   </dd>
                 </div>
                 <div><dt>Client ID</dt><dd>{{ "Gemt krypteret" if google_config.client_id else "Mangler" }}</dd></div>
@@ -272,14 +278,20 @@
                 <div>
                   <dt class="redirect-uri-dt">
                     <span>Omdirigerings-URI</span>
-                    <button type="button" class="archive-switch redirect-uri-toggle is-on" data-redirect-toggle="ms" aria-label="Brug eget domæne" aria-pressed="true">
-                      <span>Brug eget domæne</span>
+                    <button type="button" class="archive-switch redirect-uri-toggle is-on" data-redirect-toggle="ms" aria-pressed="true">
+                      <span>Brug localhost</span>
                       <span class="archive-switch-track" aria-hidden="true"><span class="archive-switch-thumb"></span></span>
                     </button>
                   </dt>
                   <dd>
-                    <code data-redirect-domain="ms" hidden>{{ redirect_uri }}</code>
                     <code data-redirect-localhost="ms">{{ localhost_redirect_uri }}</code>
+                    <div data-redirect-domain="ms" hidden class="redirect-domain-edit">
+                      <div class="redirect-domain-row">
+                        <input type="text" class="redirect-domain-input" data-domain-input="ms" data-callback-path="/auth/microsoft/callback" placeholder="https://dit-domæne.dk">
+                        <button type="button" class="redirect-copy-btn" data-domain-copy="ms" title="Kopiér redirect-URI"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg></button>
+                      </div>
+                      <code data-domain-preview="ms" hidden class="redirect-domain-preview"></code>
+                    </div>
                   </dd>
                 </div>
                 <div><dt>Client ID</dt><dd>{{ "Gemt krypteret" if microsoft_config.client_id else "Mangler" }}</dd></div>
@@ -556,18 +568,67 @@
       });
     })();
 
-    // Redirect URI toggle: ON = localhost visible, OFF = domain visible
-    document.querySelectorAll('[data-redirect-toggle]').forEach(function (btn) {
-      var key = btn.dataset.redirectToggle;
-      btn.addEventListener('click', function () {
-        var isOn = btn.classList.toggle('is-on');
-        btn.setAttribute('aria-pressed', isOn ? 'true' : 'false');
-        var domain = document.querySelector('[data-redirect-domain="' + key + '"]');
-        var local = document.querySelector('[data-redirect-localhost="' + key + '"]');
-        if (domain) domain.hidden = isOn;
-        if (local) local.hidden = !isOn;
-        btn.querySelector('span').textContent = isOn ? 'Brug eget domæne' : 'Brug localhost';
+    // Redirect URI toggle + custom domain input
+    (function () {
+      var COPY_SVG = '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>';
+      var CHECK_SVG = '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>';
+
+      function buildUri(key) {
+        var input = document.querySelector('[data-domain-input="' + key + '"]');
+        if (!input) return '';
+        var base = (input.value || '').trim().replace(/\/+$/, '');
+        var path = input.dataset.callbackPath || '';
+        return base ? base + path : '';
+      }
+
+      function updatePreview(key) {
+        var preview = document.querySelector('[data-domain-preview="' + key + '"]');
+        if (!preview) return;
+        var uri = buildUri(key);
+        preview.textContent = uri;
+        preview.hidden = !uri;
+      }
+
+      document.querySelectorAll('[data-redirect-toggle]').forEach(function (btn) {
+        var key = btn.dataset.redirectToggle;
+        btn.addEventListener('click', function () {
+          var isOn = btn.classList.toggle('is-on');
+          btn.setAttribute('aria-pressed', isOn ? 'true' : 'false');
+          var domain = document.querySelector('[data-redirect-domain="' + key + '"]');
+          var local = document.querySelector('[data-redirect-localhost="' + key + '"]');
+          if (domain) domain.hidden = isOn;
+          if (local) local.hidden = !isOn;
+          btn.querySelector('span').textContent = isOn ? 'Brug localhost' : 'Brug eget domæne';
+        });
       });
-    });
+
+      document.querySelectorAll('[data-domain-input]').forEach(function (input) {
+        input.addEventListener('input', function () { updatePreview(input.dataset.domainInput); });
+      });
+
+      document.querySelectorAll('[data-domain-copy]').forEach(function (btn) {
+        var key = btn.dataset.domainCopy;
+        btn.addEventListener('click', function () {
+          var uri = buildUri(key);
+          if (!uri) return;
+          var finish = function () {
+            btn.innerHTML = CHECK_SVG;
+            setTimeout(function () { btn.innerHTML = COPY_SVG; }, 1500);
+          };
+          if (navigator.clipboard) {
+            navigator.clipboard.writeText(uri).then(finish).catch(finish);
+          } else {
+            var ta = document.createElement('textarea');
+            ta.value = uri;
+            ta.style.cssText = 'position:fixed;opacity:0;pointer-events:none';
+            document.body.appendChild(ta);
+            ta.select();
+            try { document.execCommand('copy'); } catch (e) {}
+            document.body.removeChild(ta);
+            finish();
+          }
+        });
+      });
+    })();
   </script>
 {% endblock %}
