@@ -349,16 +349,37 @@ backup_database() {
 	backup_database_from_host
 }
 
+py_http_check() {
+	url="$1"
+	python3 -c "import urllib.request; urllib.request.urlopen('${url}', timeout=5)" 2>/dev/null
+}
+
 wait_for_fjordparcel() {
 	elapsed=0
 	echo "==> Venter paa FjordParcel health (timeout ${WAIT_TIMEOUT_SEC}s)"
+
+	# Running inside docker container (updater) → use docker network hostname directly.
+	# Running on host → use the mapped port instead.
+	in_container=0
+	[ -f "/.dockerenv" ] && in_container=1
+
+	host_port="$(read_env_value APP_PORT 2>/dev/null || true)"
+	host_port="${host_port:-8096}"
+
 	while [ "$elapsed" -lt "$WAIT_TIMEOUT_SEC" ]; do
 		container_id="$(docker_compose ps -q "$SERVICE_NAME" 2>/dev/null || true)"
 		if [ -n "$container_id" ]; then
 			state="$(docker_cmd inspect --format '{{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}' "$container_id" 2>/dev/null || true)"
 			case "$state" in
 				healthy|running)
-					if timeout 10 docker_compose exec -T "$SERVICE_NAME" python3 -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/api/health', timeout=5)" 2>/dev/null; then
+					ok=0
+					if [ "$in_container" = "1" ]; then
+						py_http_check "http://${SERVICE_NAME}:8080/api/health" && ok=1 || true
+					fi
+					if [ "$ok" = "0" ]; then
+						py_http_check "http://127.0.0.1:${host_port}/api/health" && ok=1 || true
+					fi
+					if [ "$ok" = "1" ]; then
 						echo "==> FjordParcel er klar"
 						return 0
 					fi
