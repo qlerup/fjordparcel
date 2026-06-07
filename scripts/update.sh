@@ -358,7 +358,7 @@ wait_for_fjordparcel() {
 			state="$(docker_cmd inspect --format '{{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}' "$container_id" 2>/dev/null || true)"
 			case "$state" in
 				healthy|running)
-					if docker_compose exec -T "$SERVICE_NAME" python3 -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/api/health')" 2>/dev/null; then
+					if timeout 10 docker_compose exec -T "$SERVICE_NAME" python3 -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/api/health', timeout=5)" 2>/dev/null; then
 						echo "==> FjordParcel er klar"
 						return 0
 					fi
