@@ -349,14 +349,22 @@ backup_database() {
 	backup_database_from_host
 }
 
-py_http_check() {
-	python3 - "$1" 2>/dev/null <<'PY'
-import sys, urllib.request
-try:
-    urllib.request.urlopen(sys.argv[1], timeout=5)
-except Exception:
-    raise SystemExit(1)
-PY
+http_check() {
+	url="$1"
+	if command -v wget >/dev/null 2>&1; then
+		wget -q -T 5 -O /dev/null "$url" 2>/dev/null
+		return $?
+	fi
+	if command -v curl >/dev/null 2>&1; then
+		curl -sf --max-time 5 "$url" >/dev/null 2>/dev/null
+		return $?
+	fi
+	HEALTH_URL="$url" python3 -c "
+import os, sys, urllib.request
+try: urllib.request.urlopen(os.environ['HEALTH_URL'], timeout=5)
+except: sys.exit(1)
+" 2>/dev/null
+	return $?
 }
 
 wait_for_fjordparcel() {
@@ -376,17 +384,16 @@ wait_for_fjordparcel() {
 			case "$state" in
 				healthy|running)
 					ok=0
-					# Primary: container IP via docker inspect (bypasses DNS, works everywhere)
-					container_ip="$(docker_cmd inspect --format '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' "$container_id" 2>/dev/null || true)"
-					if [ -n "$container_ip" ]; then
-						py_http_check "http://${container_ip}:8080/api/health" && ok=1 || true
+					container_ip="$(docker_cmd inspect --format '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' "$container_id" 2>/dev/null | tr -d '\n' | awk '{print $1}' || true)"
+					echo "  health-tjek: state=${state} ip=${container_ip:-ingen} container=${in_container}"
+					if [ -n "$container_ip" ] && http_check "http://${container_ip}:8080/api/health"; then
+						ok=1
 					fi
-					# Fallback: docker-network hostname (updater container) or mapped port (host)
-					if [ "$ok" = "0" ] && [ "$in_container" = "1" ]; then
-						py_http_check "http://${SERVICE_NAME}:8080/api/health" && ok=1 || true
+					if [ "$ok" = "0" ] && [ "$in_container" = "1" ] && http_check "http://${SERVICE_NAME}:8080/api/health"; then
+						ok=1
 					fi
-					if [ "$ok" = "0" ] && [ "$in_container" = "0" ]; then
-						py_http_check "http://127.0.0.1:${host_port}/api/health" && ok=1 || true
+					if [ "$ok" = "0" ] && http_check "http://127.0.0.1:${host_port}/api/health"; then
+						ok=1
 					fi
 					if [ "$ok" = "1" ]; then
 						echo "==> FjordParcel er klar"
