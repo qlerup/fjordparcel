@@ -6,6 +6,7 @@ import time
 import urllib.error
 import urllib.request
 import uuid
+import atexit
 from datetime import datetime, timezone
 import random
 
@@ -51,7 +52,9 @@ from storage import (
     load_mail_account_settings,
     normalize_settings_carrier,
     record_scan_run,
+    release_automation_leader_lock,
     refresh_shipment_tracking,
+    renew_automation_leader_lock,
     remove_carrier_postcode,
     save_mail_account_settings,
     set_shipment_archived,
@@ -59,6 +62,7 @@ from storage import (
     update_shipment_auto_label,
     update_shipment_label,
     update_shipment_mail_status,
+    try_acquire_automation_leader_lock,
 )
 from tracking import (
     SUPPORTED_SCAN_CARRIERS,
@@ -110,6 +114,11 @@ POSTNORD_PICKUP_LINK_MAX_BYTES = 250_000
 _AUTO_NEXT_SCAN_AT = {}
 _AUTO_NEXT_REFRESH_AT = 0.0
 _AUTO_THREAD_STARTED = False
+_AUTO_LEADER_OWNER_ID = uuid.uuid4().hex
+_AUTO_IS_LEADER = False
+_AUTO_LEASE_SECONDS = max(10, int(str(os.getenv("FJORDPARCEL_AUTOMATION_LEASE_SECONDS", "45") or "45")) )
+_AUTO_HEARTBEAT_INTERVAL_SECONDS = max(3, int(str(os.getenv("FJORDPARCEL_AUTOMATION_HEARTBEAT_SECONDS", "10") or "10")) )
+_AUTO_NEXT_HEARTBEAT_AT = 0.0
 
 _AUTH_EXEMPT = frozenset({
     "setup", "login", "logout",
@@ -656,7 +665,6 @@ def _run_scan_job(job_id, scan_days, account=None):
 
 @app.context_processor
 def inject_globals():
-    _ensure_automation_thread()
     accounts = connected_accounts()
     return {
         "app_name": "FjordParcel",
@@ -1249,9 +1257,28 @@ def delete_user_settings(user_id):
 
 
 def _automation_worker():
-    global _AUTO_NEXT_SCAN_AT, _AUTO_NEXT_REFRESH_AT
+    global _AUTO_NEXT_SCAN_AT, _AUTO_NEXT_REFRESH_AT, _AUTO_IS_LEADER, _AUTO_NEXT_HEARTBEAT_AT
     while True:
         try:
+            now = time.time()
+
+            if now >= _AUTO_NEXT_HEARTBEAT_AT:
+                if _AUTO_IS_LEADER:
+                    _AUTO_IS_LEADER = renew_automation_leader_lock(
+                        _AUTO_LEADER_OWNER_ID,
+                        lease_seconds=_AUTO_LEASE_SECONDS,
+                    )
+                if not _AUTO_IS_LEADER:
+                    _AUTO_IS_LEADER = try_acquire_automation_leader_lock(
+                        _AUTO_LEADER_OWNER_ID,
+                        lease_seconds=_AUTO_LEASE_SECONDS,
+                    )
+                _AUTO_NEXT_HEARTBEAT_AT = now + _AUTO_HEARTBEAT_INTERVAL_SECONDS
+
+            if not _AUTO_IS_LEADER:
+                time.sleep(5)
+                continue
+
             try:
                 archive_due_delivered_shipments()
             except Exception:
@@ -1307,6 +1334,30 @@ def _ensure_automation_thread():
     th = threading.Thread(target=_automation_worker, name="automation-worker", daemon=True)
     th.start()
     _AUTO_THREAD_STARTED = True
+
+
+def _should_start_automation_on_boot():
+    enabled_raw = str(os.getenv("FJORDPARCEL_AUTOMATION_ENABLED", "1") or "1").strip().lower()
+    if enabled_raw in {"0", "false", "no", "off"}:
+        return False
+
+    # Avoid starting duplicate worker in Flask dev reloader parent process.
+    if app.debug and os.getenv("WERKZEUG_RUN_MAIN") != "true":
+        return False
+    return True
+
+
+def _start_automation_on_boot():
+    if not _should_start_automation_on_boot():
+        return
+    _ensure_automation_thread()
+
+
+def _release_automation_lock_on_exit():
+    try:
+        release_automation_leader_lock(_AUTO_LEADER_OWNER_ID)
+    except Exception:
+        pass
 
 
 def _require_admin_for_app_update():
@@ -1425,6 +1476,10 @@ def api_settings_public_base_url():
             "google_redirect_uri": public_url_for("google_mail_callback"),
         }
     )
+
+
+_start_automation_on_boot()
+atexit.register(_release_automation_lock_on_exit)
 
 
 if __name__ == "__main__":

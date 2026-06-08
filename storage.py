@@ -22,6 +22,7 @@ from tracking_providers import TrackingLookupResult, fetch_tracking
 DATABASE_PATH = os.getenv("DATABASE_PATH", os.path.join("data", "fjordparcel.db"))
 SUPPORTED_CARRIER_SETTINGS = tuple(SUPPORTED_SCAN_CARRIERS)
 DELIVERED_ARCHIVE_AFTER = timedelta(hours=24)
+AUTOMATION_LOCK_NAME = "automation-worker"
 
 
 def normalize_text(value, max_length=None):
@@ -163,7 +164,96 @@ def init_db():
             )
             """
         )
+        db.execute(
+            """
+            CREATE TABLE IF NOT EXISTS automation_leader_lock (
+                lock_name TEXT PRIMARY KEY,
+                owner_id TEXT NOT NULL,
+                lease_expires_at TEXT NOT NULL,
+                heartbeat_at TEXT NOT NULL,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+            )
+            """
+        )
         _ensure_users_columns(db)
+
+
+def try_acquire_automation_leader_lock(owner_id, lease_seconds=30, lock_name=AUTOMATION_LOCK_NAME):
+    owner = str(owner_id or "").strip()
+    if not owner:
+        return False
+
+    now_dt = _utc_now_datetime()
+    now = now_dt.isoformat()
+    expires_at = (now_dt + timedelta(seconds=max(5, int(lease_seconds or 30)))).isoformat()
+
+    with get_connection() as db:
+        db.execute(
+            """
+            INSERT INTO automation_leader_lock (
+                lock_name,
+                owner_id,
+                lease_expires_at,
+                heartbeat_at,
+                created_at,
+                updated_at
+            )
+            VALUES (?, ?, ?, ?, ?, ?)
+            ON CONFLICT(lock_name) DO UPDATE SET
+                owner_id = excluded.owner_id,
+                lease_expires_at = excluded.lease_expires_at,
+                heartbeat_at = excluded.heartbeat_at,
+                updated_at = excluded.updated_at
+            WHERE automation_leader_lock.lease_expires_at <= ?
+               OR automation_leader_lock.owner_id = excluded.owner_id
+            """,
+            (lock_name, owner, expires_at, now, now, now, now),
+        )
+        row = db.execute(
+            "SELECT owner_id FROM automation_leader_lock WHERE lock_name = ?",
+            (lock_name,),
+        ).fetchone()
+
+    return bool(row and str(row["owner_id"]) == owner)
+
+
+def renew_automation_leader_lock(owner_id, lease_seconds=30, lock_name=AUTOMATION_LOCK_NAME):
+    owner = str(owner_id or "").strip()
+    if not owner:
+        return False
+
+    now_dt = _utc_now_datetime()
+    now = now_dt.isoformat()
+    expires_at = (now_dt + timedelta(seconds=max(5, int(lease_seconds or 30)))).isoformat()
+
+    with get_connection() as db:
+        cursor = db.execute(
+            """
+            UPDATE automation_leader_lock
+            SET lease_expires_at = ?,
+                heartbeat_at = ?,
+                updated_at = ?
+            WHERE lock_name = ? AND owner_id = ?
+            """,
+            (expires_at, now, now, lock_name, owner),
+        )
+
+    return bool(cursor.rowcount)
+
+
+def release_automation_leader_lock(owner_id, lock_name=AUTOMATION_LOCK_NAME):
+    owner = str(owner_id or "").strip()
+    if not owner:
+        return False
+
+    with get_connection() as db:
+        cursor = db.execute(
+            "DELETE FROM automation_leader_lock WHERE lock_name = ? AND owner_id = ?",
+            (lock_name, owner),
+        )
+
+    return bool(cursor.rowcount)
 
 
 def _ensure_users_columns(db):

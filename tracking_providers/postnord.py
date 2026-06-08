@@ -5,6 +5,7 @@ import json
 import os
 import re
 from datetime import datetime
+from pathlib import Path
 from typing import Any, Optional
 from urllib import error as urllib_error
 from urllib import request as urllib_request
@@ -17,21 +18,7 @@ TRACK17_SIGN = str(os.getenv("TRACK17_SIGN", "") or "").strip()
 TRACK17_TIMEZONE_OFFSET = int(str(os.getenv("TRACK17_TIMEZONE_OFFSET", "-480") or "-480"))
 DEFAULT_TIMEOUT_SECONDS = int(str(os.getenv("POSTNORD_TRACKING_TIMEOUT", "20") or "20"))
 
-DEFAULT_TRACK17_SIGN = (
-    "MjAyNTA3MjJUMTE6Mjg6NDVa/syvdjaZ8DXAqygzHsUTxW0LG1Iu21i5hdxpA+J0+Q/HZakZEmoLQDTNcGhvIwEccWT5Le7E"
-    "TUWchnJpBnovbaZcso6mj+6nlXrumoh5Fq8j9Bcegz2NZLCcVRIOIzdT8O+9lDTaOSc7GZ914H/9NRwWzmCjOkwtOX+j0b+J"
-    "3BxCIgLXaZciTnRvJ1QmB0zv62LWzb2/337czquINFgZF7uoFaXAB8FRG12oJYifNX0GMHKS9ykc+XhktmO5Dk4uYmCx282+"
-    "Vz8N1GSmtqtxGyKqxwUBIlZ0mN2Sm3UVYtqNZXhV5lgkrbf8QR2E4tcX3YPd7fbetgFibkeuXVfQtVmexR/djsKEItyUyEBO"
-    "trfyJt5+1Hu1bk4bwTJV0EEeTjiHvt3NXtm+yIEpbRBlgKx2oCglcI989qSPJ10EvZfN1E+lXG97BDgggZYOJjNBJaIgWh8H"
-    "gyLAqtqN2KLLK383NL9F1iXFc3bF8kwA5VnnosXOkb3Vy7tq2942IM/uQv5flWeajFY9bYrhcuSGaTPFmsQq7e2cClwsNTmz"
-    "itp8UeDDzUog9/CKW5G0F762eP51peCeIPQxEUVBDWWDyFepn67RlBA8oXPDK6kHVBWo4C/c2A1qsucgZcUQmVqKbMhmd/I"
-    "jAlS4EGSggMMMKgQCph4Mb7DBssFhcsixivxV50DZOoEf7mM01rV4Cah0JRrMZ3AhNgYP/hL/EUjZUFuF43BcuA4MkaBiroK"
-    "fe0OLXFW02eBxQzngYu0+dBn3vUuYaxLdwJafpxNdmmD3zQrjsvXBp6gMFSFTq46bVVXVcN3cQ/JNzS8Vg3JwhWcFb6wuEEr"
-    "amng3VWZQURTlkd/HKzlAiVpa5V/FJk8F5EkQrHaK/R/KEDkY+ic7x4EQTvsHuASkI/dyxLbjrxER4UUINGUSLlVRu34VBgZ"
-    "ICYuqzeQlj0+t3JWwf7HStGVOwiEuz2lDCP5YVNmRWYo2i4VS8lLf5xXJX0wdGLH1RhldxLv3ZnNYKhYE1ehaH9dWj+KPcVY"
-    "guCkWm/S7N0yMHcyRC/nulo4ZrAYgtw3GUTWDwZANVEu7RtOkxm3TydI1Yliq3rE92fi/OQRXTJjBZdo4fnqz/aIvwYMCwxKM"
-    "Gd6LaMuBUs6hQgMq3PRGouUV9"
-)
+BROWSER_PROFILE_DIR = Path(__file__).parent.parent / ".17track_profile"
 
 DA_TRANSLATIONS = {
     "E-mail notification has been sent to the recipient": "e-mail-meddelelse er sendt til modtageren",
@@ -123,11 +110,11 @@ def _to_danish_text(text: str) -> str:
     clean = _text(text)
     mapped = DA_TRANSLATIONS.get(clean, clean)
     if mapped.startswith("Denmark, "):
-        return "Danmark, " + mapped[len("Denmark, ") :]
+        return "Danmark, " + mapped[len("Denmark, "):]
     return mapped.replace("Denmark", "Danmark")
 
 
-def _parse_tracking_response(data: dict[str, Any], number: str) -> TrackingLookupResult:
+def _parse_tracking_response(data: dict[str, Any], number: str, source: str = "17track-restapi") -> TrackingLookupResult:
     meta = data.get("meta") if isinstance(data.get("meta"), dict) else {}
     shipments = data.get("shipments") if isinstance(data.get("shipments"), list) else []
     ok = int(meta.get("code") or 0) == 200
@@ -136,7 +123,7 @@ def _parse_tracking_response(data: dict[str, Any], number: str) -> TrackingLooku
         code = int(meta.get("code") or 0)
         message = "17TRACK fandt ingen forsendelse paa dette nummer."
         if code in {-10, -14}:
-            message = "17TRACK afviste opslaget (signatur udloeber). Opdater TRACK17_SIGN i .env."
+            message = "17TRACK kræver browser-login. Kør: python scripts/refresh_sign.py"
         return TrackingLookupResult(
             carrier="PostNord",
             tracking_number=number,
@@ -158,7 +145,7 @@ def _parse_tracking_response(data: dict[str, Any], number: str) -> TrackingLooku
         if latest_event:
             events_desc = [_parse_event(latest_event)]
 
-    latest = events_desc[0]
+    latest = events_desc[0] if events_desc else {}
     latest_status = shipment.get("latest_status") if isinstance(shipment.get("latest_status"), dict) else {}
     misc = shipment.get("misc_info") if isinstance(shipment.get("misc_info"), dict) else {}
     provider_info = provider.get("provider") if isinstance(provider.get("provider"), dict) else {}
@@ -179,7 +166,7 @@ def _parse_tracking_response(data: dict[str, Any], number: str) -> TrackingLooku
         last_event_location=latest.get("location") or "",
         events=events_desc,
         tracking_url=_tracking_url(number),
-        source="17track-restapi",
+        source=source,
         error="",
     )
 
@@ -193,12 +180,113 @@ def _build_request_payload(number: str, sign: str) -> dict[str, Any]:
     }
 
 
-def _fetch_17track_tracking(number: str, timeout: int) -> dict[str, Any]:
-    sign = TRACK17_SIGN or DEFAULT_TRACK17_SIGN
+def _try_direct_api(number: str, sign: str, timeout: int) -> Optional[dict[str, Any]]:
     if not sign:
-        raise RuntimeError("TRACK17_SIGN mangler.")
-    payload = _build_request_payload(number, sign)
-    return _request_json(TRACK17_API_URL, payload, timeout)
+        return None
+    try:
+        payload = _build_request_payload(number, sign)
+        data = _request_json(TRACK17_API_URL, payload, timeout)
+        code = int((data.get("meta") or {}).get("code") or 0)
+        if code == 200:
+            return data
+        if code in {-10, -14}:
+            return None
+    except Exception:
+        pass
+    return None
+
+
+def _save_sign_to_env(sign: str) -> None:
+    env_path = Path(__file__).parent.parent / ".env"
+    if not env_path.exists():
+        return
+    content = env_path.read_text(encoding="utf-8")
+    if "TRACK17_SIGN" in content:
+        content = re.sub(r"^TRACK17_SIGN=.*$", f"TRACK17_SIGN={sign}", content, flags=re.MULTILINE)
+    else:
+        content = content.rstrip("\n") + f"\nTRACK17_SIGN={sign}\n"
+    env_path.write_text(content, encoding="utf-8")
+
+
+def _fetch_via_playwright(number: str, timeout: int) -> dict[str, Any]:
+    try:
+        from playwright.sync_api import sync_playwright
+    except ImportError as exc:
+        raise RuntimeError("playwright er ikke installeret. Kør: pip install playwright && playwright install chromium") from exc
+
+    BROWSER_PROFILE_DIR.mkdir(parents=True, exist_ok=True)
+
+    with sync_playwright() as p:
+        ctx = p.chromium.launch_persistent_context(
+            str(BROWSER_PROFILE_DIR),
+            headless=True,
+            user_agent=(
+                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                "AppleWebKit/537.36 (KHTML, like Gecko) "
+                "Chrome/125.0.0.0 Safari/537.36"
+            ),
+            locale="da-DK",
+            viewport={"width": 1280, "height": 900},
+        )
+
+        result: dict[str, Any] = {}
+        captcha_triggered = False
+        new_sign: list[str] = []
+
+        def on_response(response: Any) -> None:
+            nonlocal captcha_triggered
+            if "captcha/generate" in response.url and response.status == 200:
+                captcha_triggered = True
+            if "restapi" in response.url and response.status == 200:
+                try:
+                    data = json.loads(response.text())
+                    if int((data.get("meta") or {}).get("code") or 0) == 200:
+                        result["data"] = data
+                        try:
+                            req_body = json.loads(response.request.post_data or "{}")
+                            sign = str(req_body.get("sign") or "")
+                            if sign:
+                                new_sign[:] = [sign]
+                        except Exception:
+                            pass
+                except Exception:
+                    pass
+
+        page = ctx.new_page()
+        page.on("request", on_request)
+        page.on("response", on_response)
+
+        page.goto(
+            f"https://t.17track.net/en#nums={number}",
+            wait_until="domcontentloaded",
+            timeout=timeout * 1000,
+        )
+
+        try:
+            page.click('button:has-text("Consent")', timeout=3000)
+        except Exception:
+            pass
+
+        try:
+            page.wait_for_load_state("networkidle", timeout=10000)
+        except Exception:
+            pass
+
+        if new_sign:
+            _save_sign_to_env(new_sign[0])
+
+        ctx.close()
+
+    if result.get("data"):
+        return result["data"]
+
+    if captcha_triggered:
+        raise RuntimeError(
+            "17TRACK kræver CAPTCHA-verificering. "
+            "Kør scripts/refresh_sign.py for at forny sign'et."
+        )
+
+    raise RuntimeError("17TRACK returnerede ingen sporingsdata.")
 
 
 def fetch_postnord_tracking(
@@ -209,9 +297,17 @@ def fetch_postnord_tracking(
     number = normalize_tracking_number(tracking_number)
     timeout_seconds = int(timeout or DEFAULT_TIMEOUT_SECONDS or 20)
 
+    sign = TRACK17_SIGN
     try:
-        data = _fetch_17track_tracking(number, timeout_seconds)
-        return _parse_tracking_response(data, number)
+        fast_data = _try_direct_api(number, sign, timeout_seconds)
+        if fast_data is not None:
+            return _parse_tracking_response(fast_data, number, source="17track-restapi")
+    except Exception:
+        pass
+
+    try:
+        data = _fetch_via_playwright(number, timeout_seconds)
+        return _parse_tracking_response(data, number, source="17track-browser")
     except urllib_error.HTTPError as exc:
         status = "Ikke fundet" if int(exc.code or 0) == 404 else "Fejl ved opdatering"
         return TrackingLookupResult(
@@ -219,7 +315,7 @@ def fetch_postnord_tracking(
             tracking_number=number,
             status=status,
             tracking_url=_tracking_url(number),
-            source="17track-restapi",
+            source="17track-browser",
             error=f"17TRACK svarede med HTTP {int(exc.code or 0)}",
         )
     except Exception as exc:
@@ -228,6 +324,6 @@ def fetch_postnord_tracking(
             tracking_number=number,
             status="Fejl ved opdatering",
             tracking_url=_tracking_url(number),
-            source="17track-restapi",
+            source="17track-browser",
             error=str(exc)[:260],
         )

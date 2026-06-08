@@ -64,4 +64,4 @@ def test_parse_tracking_response_handles_sign_error():
     result = postnord._parse_tracking_response({"meta": {"code": -10, "message": ""}, "shipments": []}, "00073215400568030824")
 
     assert result.status == "Ikke fundet"
-    assert "signatur" in result.error
+    assert "browser-login" in result.error or "refresh_sign" in result.error
