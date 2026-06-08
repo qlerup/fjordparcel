@@ -82,7 +82,10 @@ POSTNORD_PINCODE_RE = re.compile(
 )
 DAO_DELIVERED_EVENT_TEXT = "Pakken er udleveret"
 DAO_PAKKENR_RE = re.compile(r"\bpakkenr\.?\s*:?\s*(\d{8,24})\b", re.IGNORECASE)
-BRING_SPORINGSNR_RE = re.compile(r"\bsporingsnummer\s*:?\s*(\d{8,24})\b", re.IGNORECASE)
+BRING_TRACKING_URL_RE = re.compile(
+    r"https?://(?:www\.)?bring\.dk/t/(\d{8,24})\b",
+    re.IGNORECASE,
+)
 GLS_TRACK_LINK_RE = re.compile(
     r"https?://[^\s<>\"']*?gls[^\s<>\"']*?[?&]match=([A-Z0-9][A-Z0-9-]{5,30})",
     re.IGNORECASE,
@@ -305,10 +308,10 @@ def extract_dao_mail_tracking_numbers(text):
 
 
 def extract_bring_mail_tracking_numbers(text):
-    plain = _plain_text(text)
+    raw = html.unescape(str(text or ""))
     seen = set()
     results = []
-    for match in BRING_SPORINGSNR_RE.finditer(plain):
+    for match in BRING_TRACKING_URL_RE.finditer(raw):
         number = normalize_tracking_number(match.group(1))
         if number and number not in seen:
             seen.add(number)
