@@ -68,6 +68,7 @@ from tracking import (
     extract_dao_mail_tracking_numbers,
     extract_gls_mail_label,
     extract_gls_mail_tracking_numbers,
+    extract_postnord_mail_tracking_numbers,
     extract_gls_reference_numbers,
     extract_mail_label,
     extract_postnord_pickup_links,
@@ -478,6 +479,11 @@ def _scan_messages(scan_days, progress_callback, only_today=False, provider=None
             if _gls_ref not in _gls_seen:
                 candidates.append({"tracking_number": _gls_ref, "carrier": "GLS", "tracking_url": ""})
                 _gls_seen.add(_gls_ref)
+        _pn_seen = {c["tracking_number"] for c in candidates if c.get("carrier") == "PostNord"}
+        for _pn_num in extract_postnord_mail_tracking_numbers(text):
+            if _pn_num not in _pn_seen:
+                candidates.append({"tracking_number": _pn_num, "carrier": "PostNord", "tracking_url": ""})
+                _pn_seen.add(_pn_num)
         postnord_ready_mail = is_postnord_ready_mail(text)
 
         for candidate in candidates:

@@ -87,6 +87,7 @@ GLS_TRACK_LINK_RE = re.compile(
     r"https?://[^\s<>\"']*?gls[^\s<>\"']*?[?&]match=([A-Z0-9][A-Z0-9-]{5,30})",
     re.IGNORECASE,
 )
+POSTNORD_PAKKE_RE = re.compile(r"\bdin\s+pakke\s+(\d{8,24})\s+fra\b", re.IGNORECASE)
 
 NUMERIC_LENGTHS = {8, 9, 10, 11, 12, 13, 14, 15, 17, 18, 20, 22, 24}
 
@@ -324,6 +325,18 @@ def extract_gls_mail_tracking_numbers(text):
         if reference and reference not in seen:
             seen.add(reference)
             results.append(reference)
+    return results
+
+
+def extract_postnord_mail_tracking_numbers(text):
+    plain = _plain_text(text)
+    seen = set()
+    results = []
+    for match in POSTNORD_PAKKE_RE.finditer(plain):
+        number = normalize_tracking_number(match.group(1))
+        if number and number not in seen:
+            seen.add(number)
+            results.append(number)
     return results
 
 
