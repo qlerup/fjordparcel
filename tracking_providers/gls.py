@@ -250,7 +250,7 @@ def _location_text(value: Any) -> str:
 
 def _gls_number_preference(value: str) -> int:
     number = re.sub(r"[^0-9]", "", _text(value))
-    if not (8 <= len(number) <= 14):
+    if not (10 <= len(number) <= 14):
         return -1
     if len(number) == 12 and number.startswith("0"):
         return 300
@@ -283,7 +283,7 @@ def _extract_gls_tracking_number(payload: Any, fallback_number: str = "") -> str
     def add_candidate(raw: Any, context: str = "") -> None:
         nonlocal sequence
         context_text = _text(context).lower()
-        for match in re.findall(r"\d{8,14}", _text(raw)):
+        for match in re.findall(r"\d{10,14}", _text(raw)):
             pref = _gls_number_preference(match)
             if pref < 0:
                 continue

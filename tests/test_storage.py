@@ -597,6 +597,28 @@ def test_refresh_shipment_tracking_updates_tracking_number_from_provider(tmp_pat
     assert "match=027624557628" in updated["tracking_url"]
 
 
+def test_refresh_shipment_tracking_keeps_gls_number_when_provider_returns_short_fragment(tmp_path, monkeypatch):
+    monkeypatch.setattr(storage, "DATABASE_PATH", str(tmp_path / "fjordparcel.db"))
+    storage.init_db()
+    _created, shipment = storage.add_shipment("075624238061", source="mail", carrier="GLS")
+
+    def fake_fetch_tracking(number, carrier="", postal_codes=None, timeout=None):
+        return TrackingLookupResult(
+            carrier="GLS",
+            tracking_number="07562423",
+            status="leveret",
+            status_code="DELIVERED",
+            tracking_url="https://gls-group.com/DK/da/find-pakke?match=07562423",
+            source="gls-rstt028",
+        )
+
+    monkeypatch.setattr(storage, "fetch_tracking", fake_fetch_tracking)
+
+    updated = storage.refresh_shipment_tracking(shipment["id"])
+
+    assert updated["tracking_number"] == "075624238061"
+
+
 def test_refresh_shipment_tracking_keeps_dao_pickup_location_from_mail(tmp_path, monkeypatch):
     monkeypatch.setattr(storage, "DATABASE_PATH", str(tmp_path / "fjordparcel.db"))
     storage.init_db()

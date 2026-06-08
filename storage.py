@@ -1066,7 +1066,10 @@ def refresh_shipment_tracking(shipment_id):
     except Exception:
         provider_number = number
     if provider_number and provider_number != number:
-        resolved_number = provider_number
+        if carrier == "GLS":
+            resolved_number = _preferred_tracking_number(number, provider_number, carrier)
+        else:
+            resolved_number = provider_number
 
     now = utc_now()
     status = normalize_text(result.status or shipment.get("status") or "Saved", max_length=160) or "Saved"
