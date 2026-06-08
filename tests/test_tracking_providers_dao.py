@@ -50,7 +50,7 @@ def test_fetch_dao_tracking_reads_events(monkeypatch):
     assert result.status == "Paa vej til daoSHOP"
     assert result.status_code == "23"
     assert result.summary == "7-Eleven Uno-X Odensevej, Næstved"
-    assert result.pickup_location == "7-Eleven Uno-X Odensevej, Odensevej 102, 4700 Næstved"
+    assert result.pickup_location == ""
     assert result.last_event_at == "2026-06-05T07:55:52"
     assert len(result.events) == 2
     assert result.events[0]["display_date"] == "5. jun. 2026"

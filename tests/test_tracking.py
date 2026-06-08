@@ -231,8 +231,16 @@ def test_extracts_dao_sender_label_from_ready_mail():
 
 def test_extracts_pickup_code_from_dao_ready_mail():
     text = """
-    Din pakke 00057151273676436276 fra bent Felvoe er klar til afhentning hos 7-Eleven.
-    Brug afhentningskode 53828 naar du henter pakken.
+    Din pakke 00057151273676436276 fra bent Felvø er klar til afhentning hos:
+
+    7-Eleven Uno-X Odensevej
+    Odensevej 102
+    4700 Næstved
+
+    Åbningstider:
+    Mandag: 06:00 - 22:00
+
+    Brug afhentningskode 53828 når du henter pakken.
     """
 
     assert extract_pickup_code(text, "DAO") == "53828"
@@ -251,19 +259,19 @@ def test_extracts_bring_pickup_location():
 
 def test_extracts_dao_pickup_location():
     text = """
-    Din pakke 00057151273676436276 fra bent Felvoe er klar til afhentning hos:
+    Din pakke 00057151273676436276 fra bent Felvø er klar til afhentning hos:
 
     7-Eleven Uno-X Odensevej
     Odensevej 102
-    4700 Naestved
+    4700 Næstved
 
-    Aabningstider:
+    Åbningstider:
     Mandag: 06:00 - 22:00
 
-    Brug afhentningskode 53828 naar du henter pakken.
+    Brug afhentningskode 53828 når du henter pakken.
     """
 
-    assert extract_pickup_location(text, "DAO") == "7-Eleven Uno-X Odensevej Odensevej 102 4700 Naestved"
+    assert extract_pickup_location(text, "DAO") == "7-Eleven Uno-X Odensevej Odensevej 102 4700 Næstved"
 
 
 def test_extracts_postnord_pakkeshop_location():

@@ -394,7 +394,7 @@ def test_scan_updates_existing_postnord_pickup_from_link(tmp_path, monkeypatch):
     assert refresh_calls == []
 
 
-def test_scan_updates_existing_dao_pickup_code(tmp_path, monkeypatch):
+def test_scan_updates_existing_dao_pickup_location_and_code_from_mail(tmp_path, monkeypatch):
     monkeypatch.setattr(storage, "DATABASE_PATH", str(tmp_path / "fjordparcel.db"))
     storage.init_db()
     _created, existing = storage.add_shipment(
@@ -410,8 +410,15 @@ def test_scan_updates_existing_dao_pickup_code(tmp_path, monkeypatch):
             "from": {"emailAddress": {"address": "noreply@notificationmail.com", "name": "Levering"}},
             "bodyPreview": (
                 "Hej Christian\n\n"
-                "Din pakke 00057151273676436276 fra bent Felvoe er klar til afhentning hos 7-Eleven.\n"
-                "Brug afhentningskode 53828 naar du henter pakken."
+                "Din pakke 00057151273676436276 fra bent Felvø er klar til afhentning hos:\n\n"
+                "7-Eleven Uno-X Odensevej\n"
+                "Odensevej 102\n"
+                "4700 Næstved\n\n"
+                "Åbningstider:\n"
+                "Mandag: 06:00 - 22:00\n"
+                "Tirsdag: 06:00 - 22:00\n\n"
+                "Brug afhentningskode 53828 når du henter pakken.\n\n"
+                "Pakken skal afhentes senest 12.06.2026."
             ),
             "receivedDateTime": "2026-06-06T10:30:00+02:00",
         },
@@ -425,6 +432,7 @@ def test_scan_updates_existing_dao_pickup_code(tmp_path, monkeypatch):
             tracking_number=number,
             status="klar til afhentning",
             last_event_text="Pakken er klar til afhentning",
+            pickup_location="Hentested fra DAO tracking skal ignoreres",
             tracking_url=f"https://example.test/{number}",
             source=f"{carrier}-test",
         )
@@ -442,8 +450,9 @@ def test_scan_updates_existing_dao_pickup_code(tmp_path, monkeypatch):
     assert summary["found"] == 1
     assert summary["new_shipments"] == 0
     assert updated["tracking_number"] == "00057151273676436276"
+    assert updated["pickup_location"] == "7-Eleven Uno-X Odensevej Odensevej 102 4700 Næstved"
     assert updated["pickup_code"] == "53828"
-    assert updated["label"] == "bent Felvoe"
+    assert updated["label"] == "bent Felvø"
     assert refresh_calls == [("00057151273676436276", "DAO")]
 
 
@@ -455,6 +464,8 @@ def test_scan_marks_dao_udleveret_mail_as_picked_up(tmp_path, monkeypatch):
         label="bent Felvoe",
         source="mail",
         carrier="DAO",
+        pickup_location="7-Eleven Uno-X Odensevej Odensevej 102 4700 Næstved",
+        pickup_code="53828",
     )
     with storage.get_connection() as db:
         db.execute(
@@ -514,7 +525,7 @@ def test_scan_marks_dao_udleveret_mail_as_picked_up(tmp_path, monkeypatch):
                     "location": "",
                 }
             ],
-            pickup_location="7-Eleven Uno-X Odensevej, Odensevej 102, 4700 Næstved",
+            pickup_location="Hentested fra DAO tracking skal ignoreres",
             tracking_url=f"https://example.test/{number}",
             source=f"{carrier}-test",
         )
@@ -533,7 +544,8 @@ def test_scan_marks_dao_udleveret_mail_as_picked_up(tmp_path, monkeypatch):
     assert summary["new_shipments"] == 0
     assert updated["status"] == "Afhentet"
     assert updated["last_event_text"] == "Pakken er udleveret"
-    assert updated["pickup_location"] == "7-Eleven Uno-X Odensevej, Odensevej 102, 4700 Næstved"
+    assert updated["pickup_location"] == "7-Eleven Uno-X Odensevej Odensevej 102 4700 Næstved"
+    assert updated["pickup_code"] == "53828"
     assert updated["events"][0]["description"] == "Pakken er udleveret"
     assert updated["events"][1]["description"] == "Pakken er klar til afhentning"
     assert refresh_calls == [("00057151273676436276", "DAO")]

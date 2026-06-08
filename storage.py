@@ -945,7 +945,8 @@ def refresh_shipment_tracking(shipment_id):
     status = normalize_text(result.status or shipment.get("status") or "Saved", max_length=160) or "Saved"
     tracking_url = normalize_text(result.tracking_url or shipment.get("tracking_url") or build_tracking_url(number, carrier), max_length=500)
     tracking_reference = normalize_text(result.reference_number or shipment.get("tracking_reference") or "", max_length=120)
-    pickup_location = _pickup_location_for_carrier(carrier, getattr(result, "pickup_location", "")) or normalize_text(
+    provider_pickup_location = "" if carrier == "DAO" else getattr(result, "pickup_location", "")
+    pickup_location = _pickup_location_for_carrier(carrier, provider_pickup_location) or normalize_text(
         shipment.get("pickup_location") or "",
         max_length=180,
     )

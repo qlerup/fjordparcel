@@ -109,18 +109,6 @@ def _parse_event(event: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-def _pickup_location(pickup: dict[str, Any]) -> str:
-    if not isinstance(pickup, dict):
-        return ""
-
-    name = _text(pickup.get("name"))
-    address = _text(pickup.get("address"))
-    postal_city = " ".join(
-        part for part in (_text(pickup.get("postnr")), _text(pickup.get("city"))) if part
-    )
-    return ", ".join(part for part in (name, address, postal_city) if part)
-
-
 def fetch_dao_tracking(
     tracking_number: Any,
     postal_codes: Optional[list[str]] = None,
@@ -167,7 +155,6 @@ def fetch_dao_tracking(
     summary = _text(pickup.get("name"))
     if pickup.get("city"):
         summary = f"{summary}, {_text(pickup.get('city'))}".strip(", ")
-    pickup_location = _pickup_location(pickup)
 
     return TrackingLookupResult(
         carrier="DAO",
@@ -179,7 +166,6 @@ def fetch_dao_tracking(
         last_event_text=latest.get("description") or "",
         last_event_location=latest.get("location") or "",
         events=events,
-        pickup_location=pickup_location,
         tracking_url=_tracking_url(number),
         source="dao-track-parcel",
         error="",
