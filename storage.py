@@ -340,7 +340,6 @@ def _find_gls_reference_match(db, tracking_number, carrier, label, mail_received
         SELECT *
         FROM shipments
         WHERE carrier = 'GLS'
-          AND COALESCE(archived_at, '') = ''
           AND COALESCE(label, '') = ?
         """,
         (normalized_label,),
@@ -363,6 +362,39 @@ def _find_gls_reference_match(db, tracking_number, carrier, label, mail_received
         return None
 
     return max(matches, key=lambda item: (item[0], item[1], item[2]))[3]
+
+
+def _cleanup_gls_reference_duplicates(db, keeper_id, tracking_number, label, mail_received_at, now_iso):
+    if not label:
+        return
+
+    canonical_number = normalize_tracking_number(tracking_number)
+    if not canonical_number.isdigit():
+        return
+
+    incoming_dt = _parse_datetime(mail_received_at) or _parse_datetime(now_iso) or datetime.min.replace(tzinfo=timezone.utc)
+    rows = db.execute(
+        """
+        SELECT *
+        FROM shipments
+        WHERE carrier = 'GLS'
+          AND COALESCE(label, '') = ?
+          AND id != ?
+        """,
+        (label, int(keeper_id)),
+    ).fetchall()
+
+    for row in rows:
+        candidate_number = normalize_tracking_number(row["tracking_number"])
+        if candidate_number.isdigit() or candidate_number == canonical_number:
+            continue
+
+        row_dt = _parse_datetime(row["mail_received_at"])
+        if row_dt and abs((incoming_dt - row_dt).total_seconds()) > 10 * 24 * 60 * 60:
+            continue
+
+        # Delete obsolete GLS reference rows for the same shipment label after numeric package ID is known.
+        db.execute("DELETE FROM shipments WHERE id = ?", (int(row["id"]),))
 
 
 def _refresh_existing_shipment(
@@ -711,6 +743,7 @@ def add_shipment(
                 normalized_pickup_code,
                 now,
             )
+            _cleanup_gls_reference_duplicates(db, shipment_id, number, label, mail_received_at, now)
             shipment = db.execute("SELECT * FROM shipments WHERE id = ?", (shipment_id,)).fetchone()
             return False, row_to_dict(shipment)
 
@@ -739,6 +772,11 @@ def add_shipment(
                     normalized_pickup_code,
                     now,
                 )
+                db.execute(
+                    "UPDATE shipments SET archived_at = '', delivered_at = '', updated_at = ? WHERE id = ?",
+                    (now, int(shipment_id)),
+                )
+                _cleanup_gls_reference_duplicates(db, shipment_id, number, label, mail_received_at, now)
                 shipment = db.execute("SELECT * FROM shipments WHERE id = ?", (shipment_id,)).fetchone()
                 return False, row_to_dict(shipment)
             except sqlite3.IntegrityError:

@@ -355,6 +355,75 @@ def test_gls_ready_mail_links_numeric_number_to_existing_reference_shipment(tmp_
     assert len(shipments) == 1
 
 
+def test_gls_ready_mail_removes_archived_reference_duplicate_for_same_label(tmp_path, monkeypatch):
+    monkeypatch.setattr(storage, "DATABASE_PATH", str(tmp_path / "fjordparcel.db"))
+    storage.init_db()
+
+    _created_ref, reference = storage.add_shipment(
+        "YOXVB8CE",
+        label="ELEXTRA.dk",
+        source="mail",
+        carrier="GLS",
+        mail_subject="GLS pakke",
+        mail_from="noreply@gls-denmark.com",
+        mail_received_at="2026-05-28T19:19:00+02:00",
+    )
+    storage.set_shipment_archived(reference["id"], True)
+
+    with storage.get_connection() as db:
+        db.execute(
+            """
+            INSERT INTO shipments (
+                tracking_number,
+                label,
+                label_source,
+                carrier,
+                status,
+                source,
+                tracking_url,
+                mail_subject,
+                mail_from,
+                mail_received_at,
+                created_at,
+                updated_at,
+                last_seen_at
+            )
+            VALUES (?, ?, 'mail', 'GLS', 'Saved', 'mail', ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                "075624238061",
+                "ELEXTRA.dk",
+                "https://gls-group.com/DK/da/find-pakke?match=075624238061",
+                "Din pakke er nu klar til afhentning",
+                "pakke-shop@pakkeshop.dk",
+                "2026-05-29T08:55:41+00:00",
+                "2026-06-03T20:00:00+00:00",
+                "2026-06-03T20:00:00+00:00",
+                "2026-06-03T20:00:00+00:00",
+            ),
+        )
+
+    created, updated = storage.add_shipment(
+        "075624238061",
+        label="ELEXTRA.dk",
+        source="mail",
+        carrier="GLS",
+        mail_subject="Din pakke er nu klar til afhentning",
+        mail_from="pakke-shop@pakkeshop.dk",
+        mail_received_at="2026-05-29T08:55:41+00:00",
+        pickup_location="7-Eleven Odensevej Odensevej 102 4700 Naestved",
+        pickup_code="844",
+    )
+
+    shipments = storage.list_shipments(include_archived=True)
+    by_number = {item["tracking_number"]: item for item in shipments}
+
+    assert created is False
+    assert updated["tracking_number"] == "075624238061"
+    assert "YOXVB8CE" not in by_number
+    assert len(shipments) == 1
+
+
 def test_init_db_dedupes_existing_gls_alias_rows(tmp_path, monkeypatch):
     db_path = tmp_path / "fjordparcel.db"
     monkeypatch.setattr(storage, "DATABASE_PATH", str(db_path))
