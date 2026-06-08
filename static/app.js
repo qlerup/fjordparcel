@@ -476,7 +476,7 @@ document.addEventListener("DOMContentLoaded", () => {
     } else if (reconnecting && serviceOk && available && !running) {
       scheduleReload();
     } else if (reconnecting) {
-      showStatus('Opdatering koerer. FjordParcel genstarter...', 'ok');
+      showStatus('Opdatering kører. FjordParcel genstarter...', 'ok');
     } else if ((data || {}).error) {
       showStatus(String(data.error), 'err');
     } else if (!serviceOk || !available) {
@@ -486,7 +486,7 @@ document.addEventListener("DOMContentLoaded", () => {
     } else if (git.dirty) {
       showStatus('Repoet har lokale tracked aendringer.', 'err');
     } else if (running) {
-      showStatus('Opdatering koerer...', 'ok');
+      showStatus('Opdatering kører...', 'ok');
     } else if (git.current_rev && git.remote_rev) {
       showStatus('Allerede nyeste version.', 'ok');
     }
