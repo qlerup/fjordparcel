@@ -248,6 +248,118 @@ def _location_text(value: Any) -> str:
     return _text(value)
 
 
+def _gls_number_preference(value: str) -> int:
+    number = re.sub(r"[^0-9]", "", _text(value))
+    if not (8 <= len(number) <= 14):
+        return -1
+    if len(number) == 12 and number.startswith("0"):
+        return 300
+    if len(number) == 11 and number.startswith("0"):
+        return 250
+    if len(number) == 10 and not number.startswith("0"):
+        return 200
+    return 100 + len(number)
+
+
+def _extract_gls_tracking_number(payload: Any, fallback_number: str = "") -> str:
+    candidates: list[tuple[int, str, int]] = []
+    seen = set()
+    fallback_digits = re.sub(r"[^0-9]", "", _text(fallback_number))
+    sequence = 0
+
+    value_fields = (
+        "value",
+        "number",
+        "no",
+        "code",
+        "id",
+        "text",
+        "tuNo",
+        "parcelNumber",
+        "parcelNo",
+        "packageNumber",
+    )
+
+    def add_candidate(raw: Any, context: str = "") -> None:
+        nonlocal sequence
+        context_text = _text(context).lower()
+        for match in re.findall(r"\d{8,14}", _text(raw)):
+            pref = _gls_number_preference(match)
+            if pref < 0:
+                continue
+            score = pref
+            if "dansk" in context_text:
+                score += 35
+            if "pakke" in context_text or "parcel" in context_text:
+                score += 25
+            if "track" in context_text:
+                score += 10
+            if "ref" in context_text or "kunde" in context_text:
+                score -= 60
+            if fallback_digits and match == fallback_digits:
+                score -= 15
+
+            key = (match, score)
+            if key in seen:
+                continue
+            seen.add(key)
+            candidates.append((score, match, sequence))
+            sequence += 1
+
+    def walk(value: Any, parent_key: str = "") -> None:
+        if isinstance(value, list):
+            for item in value:
+                walk(item, parent_key)
+            return
+
+        if not isinstance(value, dict):
+            add_candidate(value, parent_key)
+            return
+
+        label = _text(
+            value.get("label")
+            or value.get("name")
+            or value.get("title")
+            or value.get("description")
+            or value.get("key")
+            or parent_key
+        )
+        for field in value_fields:
+            if field in value:
+                add_candidate(value.get(field), label)
+
+        for key, nested in value.items():
+            walk(nested, f"{label} {key}")
+
+    walk(payload)
+    if not candidates:
+        return _text(fallback_number)
+
+    best = sorted(candidates, key=lambda item: (-item[0], item[2]))[0]
+    return best[1]
+
+
+def _apply_tracking_number(result: TrackingLookupResult, tracking_number: str) -> TrackingLookupResult:
+    number = _text(tracking_number) or result.tracking_number
+    if number == result.tracking_number:
+        return result
+    return TrackingLookupResult(
+        carrier=result.carrier,
+        tracking_number=number,
+        status=result.status,
+        status_code=result.status_code,
+        summary=result.summary,
+        last_event_at=result.last_event_at,
+        last_event_text=result.last_event_text,
+        last_event_location=result.last_event_location,
+        events=result.events,
+        tracking_url=_tracking_url(number),
+        reference_number=result.reference_number,
+        source=result.source,
+        error=result.error,
+    )
+
+
 def _extract_detail_events(payload: Any) -> list[dict[str, Any]]:
     if isinstance(payload, dict) and isinstance(payload.get("history"), list):
         history_events = []
@@ -503,6 +615,8 @@ def fetch_gls_tracking(
     try:
         overview_payload = _request_json(_overview_url(number), timeout_seconds)
         overview_result, status_row = _parse_overview_payload(overview_payload, number)
+        overview_number = _extract_gls_tracking_number(status_row, fallback_number=number)
+        overview_result = _apply_tracking_number(overview_result, overview_number)
     except Exception as exc:
         return TrackingLookupResult(
             carrier="GLS",
@@ -536,8 +650,12 @@ def fetch_gls_tracking(
                 continue
 
             detail_events = _extract_detail_events(detail_payload)
+            detail_number = _extract_gls_tracking_number(detail_payload, fallback_number=overview_result.tracking_number)
+            resolved_result = _apply_tracking_number(overview_result, detail_number)
             if detail_events:
-                return _apply_detail_events(overview_result, detail_events)
+                return _apply_detail_events(resolved_result, detail_events)
+            if resolved_result.tracking_number != overview_result.tracking_number:
+                return resolved_result
 
     if last_detail_error and not overview_result.error:
         overview_result.error = f"Detaljer kunne ikke hentes med gemte postnumre: {last_detail_error[:180]}"

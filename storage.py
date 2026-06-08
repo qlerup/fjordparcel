@@ -941,9 +941,20 @@ def refresh_shipment_tracking(shipment_id):
     except Exception as error:
         result = _tracking_error_result(shipment, error)
 
+    resolved_number = number
+    try:
+        provider_number = normalize_tracking_number(result.tracking_number or number)
+    except Exception:
+        provider_number = number
+    if provider_number and provider_number != number:
+        resolved_number = provider_number
+
     now = utc_now()
     status = normalize_text(result.status or shipment.get("status") or "Saved", max_length=160) or "Saved"
-    tracking_url = normalize_text(result.tracking_url or shipment.get("tracking_url") or build_tracking_url(number, carrier), max_length=500)
+    tracking_url = normalize_text(
+        result.tracking_url or shipment.get("tracking_url") or build_tracking_url(resolved_number, carrier),
+        max_length=500,
+    )
     tracking_reference = normalize_text(result.reference_number or shipment.get("tracking_reference") or "", max_length=120)
     provider_pickup_location = "" if carrier == "DAO" else getattr(result, "pickup_location", "")
     pickup_location = _pickup_location_for_carrier(carrier, provider_pickup_location) or normalize_text(
@@ -954,10 +965,18 @@ def refresh_shipment_tracking(shipment_id):
     delivered_at = _delivery_fields_for_result(shipment, result, status, now)
 
     with get_connection() as db:
+        if resolved_number != number:
+            conflict = db.execute(
+                "SELECT id FROM shipments WHERE tracking_number = ? AND id != ?",
+                (resolved_number, int(shipment_id)),
+            ).fetchone()
+            if conflict:
+                resolved_number = number
         db.execute(
             """
             UPDATE shipments
             SET
+                tracking_number = ?,
                 status = ?,
                 status_code = ?,
                 summary = ?,
@@ -977,6 +996,7 @@ def refresh_shipment_tracking(shipment_id):
             WHERE id = ?
             """,
             (
+                resolved_number,
                 status,
                 normalize_text(result.status_code, max_length=120),
                 normalize_text(result.summary, max_length=500),

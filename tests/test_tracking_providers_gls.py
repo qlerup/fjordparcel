@@ -111,3 +111,46 @@ def test_fetch_gls_returns_error_result_on_overview_failure(monkeypatch):
 
     assert result.status == "Fejl ved opdatering"
     assert "Adgang" in result.error
+
+
+def test_fetch_gls_prefers_package_number_from_detail_payload(monkeypatch):
+    overview_payload = {
+        "tuStatus": [
+            {
+                "tuNo": "YMQHJ9AQ",
+                "owners": [{"tuOwnerCode": "OWNER1"}],
+                "progressBar": {
+                    "statusInfo": "DELIVERED",
+                    "statusText": "leveret",
+                    "statusBar": [],
+                },
+            }
+        ]
+    }
+    details_payload = {
+        "consignmentInformation": [
+            {"label": "Ref.nr.", "value": "YMQHJ9AQ"},
+            {"label": "Dansk pakkenummer", "value": "027624557628"},
+        ],
+        "history": [
+            {
+                "evtDscr": "Pakken er afleveret",
+                "date": "2026-05-29",
+                "time": "08:03:41",
+            }
+        ],
+    }
+
+    def fake_request(url, _timeout):
+        if "rstt029" in url:
+            return overview_payload
+        return details_payload
+
+    monkeypatch.setattr(gls, "_request_json", fake_request)
+
+    result = gls.fetch_gls_tracking("YMQHJ9AQ", postal_codes=["4100"])
+
+    assert result.reference_number == "YMQHJ9AQ"
+    assert result.tracking_number == "027624557628"
+    assert "match=027624557628" in result.tracking_url
+    assert result.source == "gls-rstt028"

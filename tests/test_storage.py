@@ -466,6 +466,31 @@ def test_refresh_shipment_tracking_uses_saved_postcodes(tmp_path, monkeypatch):
     assert updated["events"][0]["description"] == "Pakken er leveret"
 
 
+def test_refresh_shipment_tracking_updates_tracking_number_from_provider(tmp_path, monkeypatch):
+    monkeypatch.setattr(storage, "DATABASE_PATH", str(tmp_path / "fjordparcel.db"))
+    storage.init_db()
+    _created, shipment = storage.add_shipment("YMQHJ9AQ", source="mail", carrier="GLS")
+
+    def fake_fetch_tracking(number, carrier="", postal_codes=None, timeout=None):
+        return TrackingLookupResult(
+            carrier="GLS",
+            tracking_number="027624557628",
+            status="leveret",
+            status_code="DELIVERED",
+            reference_number="YMQHJ9AQ",
+            tracking_url="https://gls-group.com/DK/da/find-pakke?match=027624557628",
+            source="gls-rstt028",
+        )
+
+    monkeypatch.setattr(storage, "fetch_tracking", fake_fetch_tracking)
+
+    updated = storage.refresh_shipment_tracking(shipment["id"])
+
+    assert updated["tracking_number"] == "027624557628"
+    assert updated["tracking_reference"] == "YMQHJ9AQ"
+    assert "match=027624557628" in updated["tracking_url"]
+
+
 def test_refresh_shipment_tracking_keeps_dao_pickup_location_from_mail(tmp_path, monkeypatch):
     monkeypatch.setattr(storage, "DATABASE_PATH", str(tmp_path / "fjordparcel.db"))
     storage.init_db()

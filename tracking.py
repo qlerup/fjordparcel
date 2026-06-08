@@ -90,7 +90,15 @@ GLS_TRACK_LINK_RE = re.compile(
     r"https?://[^\s<>\"']*?gls[^\s<>\"']*?[?&](?:match|txtRefNo)=([A-Z0-9][A-Z0-9-]{5,30})",
     re.IGNORECASE,
 )
+GLS_PAKKENUMMER_RE = re.compile(
+    r"(?:dit\s+pakkenummer\s+er|gls\s+pakkenummer\s*:)\s*(\d{8,14})\b",
+    re.IGNORECASE,
+)
 POSTNORD_PAKKE_RE = re.compile(r"\bdin\s+pakke\s+(\d{8,24})\s+fra\b", re.IGNORECASE)
+POSTNORD_PICKUP_QR_RE = re.compile(
+    r"\bqr[-\s]?kode\b[^0-9]{0,80}?(\d{2}(?:[\s-]\d{2}){2,5})\b",
+    re.IGNORECASE | re.DOTALL,
+)
 
 NUMERIC_LENGTHS = {8, 9, 10, 11, 12, 13, 14, 15, 17, 18, 20, 22, 24}
 
@@ -297,18 +305,37 @@ def extract_dao_mail_event_text(text):
 
 def extract_dao_mail_tracking_numbers(text):
     plain = _plain_text(text)
-    if not (
+    seen = set()
+    results = []
+    # "Afsendt" mails
+    if (
         re.search(r"\bhar\s+netop\s+indleveret\s+en\s+pakke\b", plain, re.IGNORECASE)
         and re.search(r"\bHa.\s+en\s+god\s+dag\b", plain, re.IGNORECASE)
     ):
-        return []
-    seen = set()
-    results = []
-    for match in DAO_PAKKENR_RE.finditer(plain):
+        for match in DAO_PAKKENR_RE.finditer(plain):
+            number = normalize_tracking_number(match.group(1))
+            if number and number not in seen:
+                seen.add(number)
+                results.append(number)
+        return results
+    # "Klar til afhentning" mails: "din pakke {number} fra X er klar til afhentning"
+    for match in re.finditer(
+        r"\bdin\s+pakke\s+(\d{8,24})\s+fra\b.{0,120}?\ber\s+klar\s+til\s+afhentning\b",
+        plain, re.IGNORECASE | re.DOTALL,
+    ):
         number = normalize_tracking_number(match.group(1))
         if number and number not in seen:
             seen.add(number)
             results.append(number)
+    if results:
+        return results
+    # "Udleveret" mails: "Pakken er udleveret" + Pakkenr.
+    if re.search(r"\bpakken\s+er\s+udleveret\b", plain, re.IGNORECASE):
+        for match in DAO_PAKKENR_RE.finditer(plain):
+            number = normalize_tracking_number(match.group(1))
+            if number and number not in seen:
+                seen.add(number)
+                results.append(number)
     return results
 
 
