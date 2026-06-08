@@ -514,7 +514,7 @@ def test_scan_marks_dao_udleveret_mail_as_picked_up(tmp_path, monkeypatch):
                     "location": "",
                 }
             ],
-            pickup_location="7-Eleven Uno-X Odensevej, Odensevej 102, 4700 Naestved",
+            pickup_location="7-Eleven Uno-X Odensevej, Odensevej 102, 4700 Næstved",
             tracking_url=f"https://example.test/{number}",
             source=f"{carrier}-test",
         )
@@ -533,7 +533,7 @@ def test_scan_marks_dao_udleveret_mail_as_picked_up(tmp_path, monkeypatch):
     assert summary["new_shipments"] == 0
     assert updated["status"] == "Afhentet"
     assert updated["last_event_text"] == "Pakken er udleveret"
-    assert updated["pickup_location"] == "7-Eleven Uno-X Odensevej, Odensevej 102, 4700 Naestved"
+    assert updated["pickup_location"] == "7-Eleven Uno-X Odensevej, Odensevej 102, 4700 Næstved"
     assert updated["events"][0]["description"] == "Pakken er udleveret"
     assert updated["events"][1]["description"] == "Pakken er klar til afhentning"
     assert refresh_calls == [("00057151273676436276", "DAO")]

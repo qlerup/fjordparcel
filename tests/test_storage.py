@@ -482,7 +482,7 @@ def test_refresh_shipment_tracking_updates_pickup_location_from_provider(tmp_pat
             tracking_number=number,
             status="Klar til afhentning",
             last_event_text="Klar til afhentning",
-            pickup_location="7-Eleven Uno-X Odensevej, Odensevej 102, 4700 Naestved",
+            pickup_location="7-Eleven Uno-X Odensevej, Odensevej 102, 4700 Næstved",
             tracking_url=f"https://example.test/{number}",
             source="dao-test",
         )
@@ -491,4 +491,4 @@ def test_refresh_shipment_tracking_updates_pickup_location_from_provider(tmp_pat
 
     updated = storage.refresh_shipment_tracking(shipment["id"])
 
-    assert updated["pickup_location"] == "7-Eleven Uno-X Odensevej, Odensevej 102, 4700 Naestved"
+    assert updated["pickup_location"] == "7-Eleven Uno-X Odensevej, Odensevej 102, 4700 Næstved"
