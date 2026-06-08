@@ -123,7 +123,7 @@ def _parse_tracking_response(data: dict[str, Any], number: str, source: str = "1
         code = int(meta.get("code") or 0)
         message = "17TRACK fandt ingen forsendelse paa dette nummer."
         if code in {-10, -14}:
-            message = "17TRACK kræver browser-login. Kør: python scripts/refresh_sign.py"
+            message = "17TRACK kræver fornyelse. Gå til Indstillinger → Fragtfirmaer → PostNord og tryk 'Forny sign'."
         return TrackingLookupResult(
             carrier="PostNord",
             tracking_number=number,
@@ -253,7 +253,6 @@ def _fetch_via_playwright(number: str, timeout: int) -> dict[str, Any]:
                     pass
 
         page = ctx.new_page()
-        page.on("request", on_request)
         page.on("response", on_response)
 
         page.goto(

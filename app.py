@@ -146,6 +146,8 @@ _ADMIN_ONLY_ENDPOINTS = frozenset({
     "create_user_settings",
     "delete_user_settings",
     "save_postnord_sign",
+    "postnord_captcha_page",
+    "postnord_captcha_verify",
 })
 
 
@@ -1089,6 +1091,103 @@ def save_postnord_sign():
     _postnord.TRACK17_SIGN = sign
     flash("17TRACK sign opdateret — tracking virker nu igen.", "success")
     return redirect(url_for("settings", section="carriers", carrier="PostNord"))
+
+
+@app.get("/settings/postnord/captcha")
+def postnord_captcha_page():
+    import tracking_providers.postnord as _postnord
+
+    sign = _postnord.TRACK17_SIGN
+    if not sign:
+        flash("Intet 17TRACK sign er konfigureret endnu. Gem et sign nedenfor, og prøv igen.", "error")
+        return redirect(url_for("settings", section="carriers", carrier="PostNord"))
+
+    _17track_headers = {
+        "Accept": "application/json",
+        "Content-Type": "application/json",
+        "Origin": "https://t.17track.net",
+        "Referer": "https://t.17track.net/",
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36",
+    }
+    try:
+        body = json.dumps({"type": "17track"}).encode()
+        req = urllib.request.Request(
+            "https://t.17track.net/captcha/generate",
+            data=body,
+            method="POST",
+            headers=_17track_headers,
+        )
+        with urllib.request.urlopen(req, timeout=15) as resp:
+            captcha_resp = json.loads(resp.read().decode())
+    except Exception as exc:
+        flash(f"Kunne ikke hente captcha fra 17TRACK: {exc}", "error")
+        return redirect(url_for("settings", section="carriers", carrier="PostNord"))
+
+    if int(captcha_resp.get("code") or 0) != 200:
+        flash("17TRACK returnerede en fejl ved captcha-generering.", "error")
+        return redirect(url_for("settings", section="carriers", carrier="PostNord"))
+
+    data = captcha_resp["data"]
+    options = [{"key": opt["key"], "image": opt["content"]} for opt in data["options"]]
+    return render_template(
+        "postnord_captcha.html",
+        captcha_id=data["captcha_id"],
+        prompt_image=data["prompt"],
+        options=options,
+    )
+
+
+@app.post("/settings/postnord/captcha")
+def postnord_captcha_verify():
+    import tracking_providers.postnord as _postnord
+
+    captcha_id = str(request.form.get("captcha_id") or "").strip()
+    selected = request.form.getlist("selected")
+
+    if not captcha_id:
+        flash("Ugyldig captcha-session — prøv igen.", "error")
+        return redirect(url_for("postnord_captcha_page"))
+
+    if not selected:
+        flash("Vælg mindst ét billede, før du bekræfter.", "error")
+        return redirect(url_for("postnord_captcha_page"))
+
+    sign = _postnord.TRACK17_SIGN
+    if not sign:
+        flash("Intet sign konfigureret — kan ikke verificere captcha.", "error")
+        return redirect(url_for("settings", section="carriers", carrier="PostNord"))
+
+    _17track_headers = {
+        "Accept": "application/json",
+        "Content-Type": "application/json",
+        "Origin": "https://t.17track.net",
+        "Referer": "https://t.17track.net/",
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36",
+    }
+    try:
+        body = json.dumps({"captcha_id": captcha_id, "selected": selected, "sign": sign}).encode()
+        req = urllib.request.Request(
+            "https://t.17track.net/captcha/verify/17track",
+            data=body,
+            method="POST",
+            headers=_17track_headers,
+        )
+        with urllib.request.urlopen(req, timeout=15) as resp:
+            verify_resp = json.loads(resp.read().decode())
+    except Exception as exc:
+        flash(f"Fejl under captcha-verificering: {exc}", "error")
+        return redirect(url_for("postnord_captcha_page"))
+
+    code = int(verify_resp.get("code") or 0)
+    if code == 200:
+        flash("Sign er nu aktivt — PostNord-tracking virker igen!", "success")
+        return redirect(url_for("settings", section="carriers", carrier="PostNord"))
+    elif code == -22:
+        flash("Forkert billeder valgt — prøv igen med et nyt billede.", "error")
+        return redirect(url_for("postnord_captcha_page"))
+    else:
+        flash(f"17TRACK afviste verificeringen (kode {code}). Prøv igen.", "error")
+        return redirect(url_for("postnord_captcha_page"))
 
 
 @app.post("/mail/scan")

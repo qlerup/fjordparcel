@@ -392,21 +392,31 @@
             <span class="badge error">Mangler</span>
           {% endif %}
         </div>
+        {% if track17_sign_set %}
         <p class="setting-line">
-          PostNord-tracking bruger 17TRACK. N&aring;r sign'et udl&oslash;ber (ca. &eacute;n gang om &aring;ret), skal du forny det:
+          Sign'et er konfigureret. Hvis PostNord-tracking holder op med at virke (ca. &eacute;n gang om &aring;ret), skal du forny det ved at l&oslash;se en billedg&aring;de:
         </p>
-        <ol class="setting-line" style="margin-left:1.2em; line-height:2">
-          <li>K&oslash;r <code>python scripts/refresh_sign.py</code> p&aring; din computer</li>
-          <li>Scriptet viser sign'et &mdash; kopier det</li>
-          <li>Inds&aelig;t det nedenfor og gem</li>
-        </ol>
-        <form class="settings-form" method="post" action="{{ url_for('save_postnord_sign') }}" accept-charset="UTF-8">
-          <label>
-            <span>17TRACK sign</span>
-            <textarea name="sign" rows="3" placeholder="Indsæt nyt sign her..." style="font-family:monospace;font-size:0.78em;resize:vertical"></textarea>
-          </label>
-          <button type="submit">Gem sign</button>
-        </form>
+        <div class="button-row">
+          <a class="button-link" href="{{ url_for('postnord_captcha_page') }}">Forny sign (l&oslash;s billedg&aring;de)</a>
+        </div>
+        {% else %}
+        <p class="setting-line">
+          PostNord-tracking kr&aelig;ver et 17TRACK sign. Tryk p&aring; knappen nedenfor for at l&oslash;se en simpel billedg&aring;de og aktivere tracking:
+        </p>
+        <div class="button-row">
+          <a class="button-link" href="{{ url_for('postnord_captcha_page') }}">Aktiv&eacute;r tracking (l&oslash;s billedg&aring;de)</a>
+        </div>
+        {% endif %}
+        <details style="margin-top:1rem">
+          <summary style="cursor:pointer;font-size:0.85em;color:var(--text-muted,#888)">Avanceret: inds&aelig;t sign manuelt</summary>
+          <form class="settings-form" method="post" action="{{ url_for('save_postnord_sign') }}" accept-charset="UTF-8" style="margin-top:0.75rem">
+            <label>
+              <span>17TRACK sign</span>
+              <textarea name="sign" rows="3" placeholder="Indsæt sign her..." style="font-family:monospace;font-size:0.78em;resize:vertical"></textarea>
+            </label>
+            <button type="submit">Gem sign</button>
+          </form>
+        </details>
       </div>
       {% endif %}
 
