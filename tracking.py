@@ -332,7 +332,10 @@ def extract_bring_mail_tracking_numbers(text):
 
 def extract_gls_mail_tracking_numbers(text):
     plain = _plain_text(text)
-    if not re.search(r"\bafsendt\s+med\s+GLS\b", plain, re.IGNORECASE):
+    if not (
+        re.search(r"\btak\s+fordi\s+du\s+handlede\s+hos\b", plain, re.IGNORECASE)
+        and re.search(r"\bafsendt\s+med\s+GLS\b", plain, re.IGNORECASE)
+    ):
         return []
     raw = html.unescape(str(text or ""))
     seen = set()
