@@ -3,6 +3,7 @@ from tracking import (
     classify_shipment_status,
     detect_carrier,
     extract_bring_mail_label,
+    extract_dao_mail_event_text,
     extract_dao_mail_label,
     extract_gls_mail_label,
     extract_gls_reference_numbers,
@@ -43,6 +44,12 @@ def test_detects_postnord_from_context():
 
 def test_classifies_dao_udleveret_as_delivered():
     assert classify_shipment_status(carrier="DAO", last_event_text="Pakken er udleveret") == "delivered"
+
+
+def test_extracts_dao_udleveret_event_from_mail_text():
+    text = "dao har nyt om din pakke. Pakken er udleveret. Pakkenr.: 00057151273676436276"
+
+    assert extract_dao_mail_event_text(text) == "Pakken er udleveret"
 
 
 def test_generic_udleveret_is_not_delivered_for_bring_yet():

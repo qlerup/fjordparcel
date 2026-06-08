@@ -63,6 +63,7 @@ from storage import (
 from tracking import (
     SUPPORTED_SCAN_CARRIERS,
     classify_shipment_status,
+    extract_dao_mail_event_text,
     extract_gls_mail_label,
     extract_gls_reference_numbers,
     extract_mail_label,
@@ -481,6 +482,9 @@ def _scan_messages(scan_days, progress_callback, only_today=False, provider=None
             mail_ready_for_pickup = candidate["carrier"] == "PostNord" and (
                 candidate.get("mail_ready_for_pickup") or postnord_ready_mail
             )
+            dao_mail_event_text = (
+                extract_dao_mail_event_text(text) if candidate["carrier"] == "DAO" else None
+            )
 
             found_key = (candidate["carrier"], candidate_key)
             if found_key not in found_keys:
@@ -506,6 +510,17 @@ def _scan_messages(scan_days, progress_callback, only_today=False, provider=None
                     "PostNord-pakken er klar til afhentning",
                     received_at,
                 )
+                refreshed_keys.add(found_key)
+                continue
+            if shipment and dao_mail_event_text:
+                update_shipment_mail_status(
+                    shipment["id"],
+                    "Afhentet",
+                    dao_mail_event_text,
+                    received_at,
+                    add_event=True,
+                )
+                archive_due_delivered_shipments()
                 refreshed_keys.add(found_key)
                 continue
             if shipment and found_key not in refreshed_keys:

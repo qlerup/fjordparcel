@@ -1,3 +1,5 @@
+import json
+
 import app as app_module
 import storage
 from tracking_providers import TrackingLookupResult
@@ -443,6 +445,86 @@ def test_scan_updates_existing_dao_pickup_code(tmp_path, monkeypatch):
     assert updated["pickup_code"] == "53828"
     assert updated["label"] == "bent Felvoe"
     assert refresh_calls == [("00057151273676436276", "DAO")]
+
+
+def test_scan_marks_dao_udleveret_mail_as_picked_up(tmp_path, monkeypatch):
+    monkeypatch.setattr(storage, "DATABASE_PATH", str(tmp_path / "fjordparcel.db"))
+    storage.init_db()
+    _created, existing = storage.add_shipment(
+        "00057151273676436276",
+        label="bent Felvoe",
+        source="mail",
+        carrier="DAO",
+    )
+    with storage.get_connection() as db:
+        db.execute(
+            """
+            UPDATE shipments
+            SET status = 'klar til afhentning',
+                last_event_at = '2026-06-06T08:00:00+02:00',
+                last_event_text = 'Pakken er klar til afhentning',
+                events_json = ?
+            WHERE id = ?
+            """,
+            (
+                json.dumps(
+                    [
+                        {
+                            "description": "Pakken er klar til afhentning",
+                            "status": "",
+                            "date_iso": "2026-06-06T08:00:00+02:00",
+                            "display_date": "",
+                            "display_time": "",
+                            "location": "",
+                        }
+                    ]
+                ),
+                existing["id"],
+            ),
+        )
+
+    messages = [
+        {
+            "subject": "Din pakke er udleveret",
+            "from": {"emailAddress": {"address": "noreply@dao.as", "name": "dao"}},
+            "bodyPreview": (
+                "Hej Christian\n\n"
+                "Pakken er udleveret.\n"
+                "Pakkenr.: 00057151273676436276"
+            ),
+            "receivedDateTime": "2999-06-06T10:30:00+02:00",
+        },
+    ]
+    refresh_calls = []
+
+    def fake_fetch_tracking(number, carrier="", postal_codes=None, timeout=None):
+        refresh_calls.append((number, carrier))
+        return TrackingLookupResult(
+            carrier=carrier,
+            tracking_number=number,
+            status="klar til afhentning",
+            last_event_text="Pakken er klar til afhentning",
+            tracking_url=f"https://example.test/{number}",
+            source=f"{carrier}-test",
+        )
+
+    monkeypatch.setattr(
+        app_module.mail_services,
+        "iter_recent_messages",
+        lambda _days, progress_callback=None: iter(messages),
+    )
+    monkeypatch.setattr(storage, "fetch_tracking", fake_fetch_tracking)
+
+    summary = app_module._scan_messages(14, lambda **_updates: None)
+    updated = storage.get_shipment(existing["id"])
+
+    assert summary["found"] == 1
+    assert summary["new_shipments"] == 0
+    assert updated["status"] == "Afhentet"
+    assert updated["last_event_text"] == "Pakken er udleveret"
+    assert updated["events"][0]["description"] == "Pakken er udleveret"
+    assert updated["events"][1]["description"] == "Pakken er klar til afhentning"
+    assert refresh_calls == []
 
 
 def test_scan_updates_existing_bring_pickup_location_and_code(tmp_path, monkeypatch):

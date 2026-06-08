@@ -80,6 +80,7 @@ POSTNORD_PINCODE_RE = re.compile(
     r"\bpinkoden?\s+(\d{4,12})\b",
     re.IGNORECASE,
 )
+DAO_DELIVERED_EVENT_TEXT = "Pakken er udleveret"
 
 NUMERIC_LENGTHS = {8, 9, 10, 11, 12, 13, 14, 15, 17, 18, 20, 22, 24}
 
@@ -275,6 +276,13 @@ def is_postnord_ready_mail(text):
             flags=re.IGNORECASE | re.DOTALL,
         )
     )
+
+
+def extract_dao_mail_event_text(text):
+    plain = _plain_text(text)
+    if re.search(r"\bpakken\s+er\s+udleveret\b", plain, flags=re.IGNORECASE):
+        return DAO_DELIVERED_EVENT_TEXT
+    return None
 
 
 def extract_postnord_pickup_links(text):

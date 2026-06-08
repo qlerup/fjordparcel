@@ -766,15 +766,56 @@ def update_shipment_auto_label(shipment_id, label):
     return row_to_dict(row)
 
 
-def update_shipment_mail_status(shipment_id, status, last_event_text=None, last_event_at=None):
+def update_shipment_mail_status(shipment_id, status, last_event_text=None, last_event_at=None, add_event=False):
     next_status = normalize_text(status, max_length=160) or "Saved"
     next_event_text = normalize_text(last_event_text or next_status, max_length=500)
     next_event_at = normalize_text(last_event_at or utc_now(), max_length=80)
     now = utc_now()
 
     with get_connection() as db:
+        event_args = []
+        event_sql = ""
+        if add_event and next_event_text:
+            row = db.execute("SELECT events_json FROM shipments WHERE id = ?", (int(shipment_id),)).fetchone()
+            try:
+                events = json.loads(str((row or {})["events_json"] or "[]")) if row else []
+            except (TypeError, ValueError, json.JSONDecodeError):
+                events = []
+            if not isinstance(events, list):
+                events = []
+
+            next_event_key = normalize_key_text(next_event_text)
+            next_event_date_key = normalize_text(next_event_at, max_length=80)
+
+            def is_same_event(event):
+                if not isinstance(event, dict):
+                    return False
+                event_text = normalize_key_text(event.get("description") or event.get("status") or "")
+                event_date = normalize_text(
+                    event.get("date_iso") or event.get("display_date") or event.get("display_time") or "",
+                    max_length=80,
+                )
+                return event_text == next_event_key and (
+                    not next_event_date_key or not event_date or event_date == next_event_date_key
+                )
+
+            if not any(is_same_event(event) for event in events):
+                events = [
+                    {
+                        "description": next_event_text,
+                        "status": "",
+                        "date_iso": next_event_at,
+                        "display_date": "",
+                        "display_time": "",
+                        "location": "",
+                    },
+                    *events,
+                ]
+            event_sql = ", events_json = ?"
+            event_args.append(json.dumps(events[:30], ensure_ascii=False))
+
         db.execute(
-            """
+            f"""
             UPDATE shipments
             SET
                 status = ?,
@@ -785,6 +826,7 @@ def update_shipment_mail_status(shipment_id, status, last_event_text=None, last_
                 tracking_error = '',
                 updated_at = ?,
                 last_seen_at = ?
+                {event_sql}
             WHERE id = ?
             """,
             (
@@ -793,6 +835,7 @@ def update_shipment_mail_status(shipment_id, status, last_event_text=None, last_
                 next_event_text,
                 now,
                 now,
+                *event_args,
                 int(shipment_id),
             ),
         )
