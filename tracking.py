@@ -333,6 +333,8 @@ def extract_gls_mail_tracking_numbers(text):
 
 def extract_postnord_mail_tracking_numbers(text):
     plain = _plain_text(text)
+    if not re.search(r"\bpostnord[.-]pakke\b", plain, re.IGNORECASE):
+        return []
     seen = set()
     results = []
     for match in POSTNORD_PAKKE_RE.finditer(plain):
