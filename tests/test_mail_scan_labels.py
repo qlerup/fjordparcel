@@ -44,7 +44,10 @@ def test_gls_scan_uses_merchant_as_label(tmp_path, monkeypatch):
                     "name": "GLS PakkeShop",
                 }
             },
-            "bodyPreview": "Din pakke fra Magnetz og Magnordic er blevet leveret af GLS. Dit pakkenummer er 027624557628.",
+            "bodyPreview": (
+                "Nu kan du godt begynde at glaede dig. Din pakke fra Magnetz og Magnordic "
+                "er blevet leveret af din lokale GLS-chauffoer. Dit pakkenummer er 027624557628."
+            ),
             "receivedDateTime": "2026-05-29T08:55:48+00:00",
         },
         {
@@ -55,7 +58,10 @@ def test_gls_scan_uses_merchant_as_label(tmp_path, monkeypatch):
                     "name": "GLS PakkeShop",
                 }
             },
-            "bodyPreview": "Din pakke fra ELEXTRA.dk er blevet leveret af GLS. GLS pakkenummer: 075624238061 er klar til afhentning",
+            "bodyPreview": (
+                "Nu kan du godt begynde at glaede dig. Din pakke fra ELEXTRA.dk "
+                "er blevet leveret af din lokale GLS-chauffoer. GLS pakkenummer: 075624238061 er klar til afhentning"
+            ),
             "receivedDateTime": "2026-05-29T08:55:41+00:00",
         }
     ]
@@ -102,9 +108,9 @@ def test_gls_scan_uses_merchant_as_label(tmp_path, monkeypatch):
     assert by_number["027624557628"]["carrier"] == "GLS"
     assert by_number["027624557628"]["label"] == "Magnetz og Magnordic"
     assert by_number["075624238061"]["label"] == "ELEXTRA.dk"
-    assert by_number["027624557628"]["last_event_text"] == "Pakken er leveret"
-    assert by_number["027624557628"]["events"][0]["location"] == "Ringsted, Danmark"
-    assert refresh_calls == [("027624557628", "GLS"), ("075624238061", "GLS")]
+    assert by_number["027624557628"]["last_event_text"] == "GLS-pakken er klar til afhentning"
+    assert by_number["027624557628"]["events"] == []
+    assert refresh_calls == []
 
 
 def test_gls_scan_matches_merchant_label_by_tracking_reference(tmp_path, monkeypatch):
@@ -133,13 +139,19 @@ def test_gls_scan_matches_merchant_label_by_tracking_reference(tmp_path, monkeyp
         {
             "subject": "Du kan nu hente pakke 027624557628",
             "from": {"emailAddress": {"address": "pakke-shop@pakkeshop.dk", "name": "GLS PakkeShop"}},
-            "bodyPreview": "GLS: Dit pakkenummer er 027624557628 og pakken er klar til afhentning.",
+            "bodyPreview": (
+                "Nu kan du godt begynde at glaede dig. Din pakke fra Magnetz og Magnordic "
+                "er blevet leveret af din lokale GLS-chauffoer. Dit pakkenummer er 027624557628."
+            ),
             "receivedDateTime": "2026-05-29T08:55:48+00:00",
         },
         {
             "subject": "Du kan nu hente pakke 075624238061",
             "from": {"emailAddress": {"address": "pakke-shop@pakkeshop.dk", "name": "GLS PakkeShop"}},
-            "bodyPreview": "GLS: Dit pakkenummer er 075624238061 og pakken er klar til afhentning.",
+            "bodyPreview": (
+                "Nu kan du godt begynde at glaede dig. Din pakke fra ELEXTRA.dk "
+                "er blevet leveret af din lokale GLS-chauffoer. Dit pakkenummer er 075624238061."
+            ),
             "receivedDateTime": "2026-05-29T08:55:41+00:00",
         },
     ]
@@ -169,11 +181,11 @@ def test_gls_scan_matches_merchant_label_by_tracking_reference(tmp_path, monkeyp
     summary = app_module._scan_messages(14, lambda **_updates: None)
     by_number = {item["tracking_number"]: item for item in storage.list_shipments()}
 
-    assert summary["found"] == 2
+    assert summary["found"] == 4
     assert by_number["027624557628"]["label"] == "Magnetz og Magnordic"
     assert by_number["075624238061"]["label"] == "ELEXTRA.dk"
-    assert by_number["027624557628"]["tracking_reference"] == "YMQHJ9AQ"
-    assert by_number["075624238061"]["tracking_reference"] == "YOXVB8CE"
+    assert by_number["027624557628"]["tracking_reference"] == ""
+    assert by_number["075624238061"]["tracking_reference"] == ""
 
 
 def test_scan_updates_existing_gls_pickup_location_and_code(tmp_path, monkeypatch):

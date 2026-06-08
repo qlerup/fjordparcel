@@ -6,6 +6,7 @@ from tracking import (
     extract_dao_mail_event_text,
     extract_dao_mail_label,
     extract_gls_mail_label,
+    extract_gls_mail_tracking_numbers,
     extract_gls_reference_numbers,
     extract_postnord_mail_label,
     extract_postnord_pickup_links,
@@ -14,6 +15,7 @@ from tracking import (
     extract_pickup_code,
     extract_pickup_location,
     extract_tracking_numbers,
+    is_gls_ready_mail,
     is_postnord_ready_mail,
     normalize_tracking_number,
 )
@@ -195,6 +197,31 @@ def test_extracts_gls_reference_from_tracking_link():
     """
 
     assert extract_gls_reference_numbers(text) == ["YOXVB8CE"]
+
+
+def test_detects_gls_ready_mail_by_required_phrases():
+    text = (
+        "Nu kan du godt begynde at glaede dig. Din pakke fra Magnetz og Magnordic "
+        "er blevet leveret af din lokale GLS-chauffoer."
+    )
+
+    assert is_gls_ready_mail(text) is True
+
+
+def test_extracts_gls_package_number_from_ready_mail():
+    text = (
+        "Nu kan du godt begynde at glaede dig. Din pakke fra Magnetz og Magnordic "
+        "er blevet leveret af din lokale GLS-chauffoer. "
+        "Dit pakkenummer er 027624557628."
+    )
+
+    assert extract_gls_mail_tracking_numbers(text) == ["027624557628"]
+
+
+def test_does_not_extract_gls_ready_number_without_required_delivery_phrase():
+    text = "GLS: Dit pakkenummer er 027624557628 og pakken er klar til afhentning."
+
+    assert extract_gls_mail_tracking_numbers(text) == []
 
 
 def test_extracts_dao_sender_label_from_mail():

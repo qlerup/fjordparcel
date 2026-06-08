@@ -78,6 +78,7 @@ from tracking import (
     extract_pickup_location,
 
     gls_alias_key,
+    is_gls_ready_mail,
     is_postnord_ready_mail,
     normalize_gls_reference,
 )
@@ -476,6 +477,7 @@ def _scan_messages(scan_days, progress_callback, only_today=False, provider=None
                     candidates.append({"tracking_number": _num, "carrier": _carrier, "tracking_url": ""})
                     seen_numbers.add((_carrier, _num))
         postnord_ready_mail = is_postnord_ready_mail(text)
+        gls_ready_mail = is_gls_ready_mail(text)
 
         for candidate in candidates:
             if candidate["carrier"] not in SUPPORTED_SCAN_CARRIERS:
@@ -494,8 +496,12 @@ def _scan_messages(scan_days, progress_callback, only_today=False, provider=None
                 pickup_code = extract_postnord_pincode(text)
             else:
                 pickup_code = candidate.get("pickup_code") or extract_pickup_code(text, candidate["carrier"])
-            mail_ready_for_pickup = candidate["carrier"] == "PostNord" and (
-                candidate.get("mail_ready_for_pickup") or postnord_ready_mail
+            mail_ready_for_pickup = (
+                candidate["carrier"] == "PostNord"
+                and (candidate.get("mail_ready_for_pickup") or postnord_ready_mail)
+            ) or (
+                candidate["carrier"] == "GLS"
+                and (candidate.get("mail_ready_for_pickup") or gls_ready_mail)
             )
             dao_mail_event_text = (
                 extract_dao_mail_event_text(text) if candidate["carrier"] == "DAO" else None
@@ -519,10 +525,13 @@ def _scan_messages(scan_days, progress_callback, only_today=False, provider=None
             if created:
                 created_count += 1
             if shipment and mail_ready_for_pickup:
+                ready_text = "PostNord-pakken er klar til afhentning"
+                if candidate["carrier"] == "GLS":
+                    ready_text = "GLS-pakken er klar til afhentning"
                 update_shipment_mail_status(
                     shipment["id"],
                     "Klar til afhentning",
-                    "PostNord-pakken er klar til afhentning",
+                    ready_text,
                     received_at,
                 )
                 refreshed_keys.add(found_key)

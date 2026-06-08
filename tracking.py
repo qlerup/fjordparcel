@@ -296,6 +296,21 @@ def is_postnord_ready_mail(text):
     )
 
 
+def is_gls_ready_mail(text):
+    plain = _plain_text(text)
+    has_intro = re.search(
+        r"\bnu\s+kan\s+du\s+godt\s+begynde\s+at\s+(?:glæde|glaede)\s+dig\.\s+din\s+pakke\s+fra\b",
+        plain,
+        flags=re.IGNORECASE,
+    )
+    has_delivery = re.search(
+        r"\ber\s+blevet\s+leveret\s+af\s+din\s+lokale\s+gls-?chauff(?:ør|oer)\b",
+        plain,
+        flags=re.IGNORECASE,
+    )
+    return bool(has_intro and has_delivery)
+
+
 def extract_dao_mail_event_text(text):
     plain = _plain_text(text)
     if re.search(r"\bpakken\s+er\s+udleveret\b", plain, flags=re.IGNORECASE):
@@ -359,6 +374,16 @@ def extract_bring_mail_tracking_numbers(text):
 
 def extract_gls_mail_tracking_numbers(text):
     plain = _plain_text(text)
+    if is_gls_ready_mail(plain):
+        seen = set()
+        results = []
+        for match in GLS_PAKKENUMMER_RE.finditer(plain):
+            number = normalize_tracking_number(match.group(1))
+            if number and number not in seen:
+                seen.add(number)
+                results.append(number)
+        return results
+
     if not (
         re.search(r"\btak\s+fordi\s+du\s+handlede\s+hos\b", plain, re.IGNORECASE)
         and re.search(r"\bafsendt\s+med\s+GLS\b", plain, re.IGNORECASE)
