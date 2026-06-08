@@ -145,6 +145,7 @@ _ADMIN_ONLY_ENDPOINTS = frozenset({
     "remove_carrier_postal_code_entry",
     "create_user_settings",
     "delete_user_settings",
+    "save_postnord_sign",
 })
 
 
@@ -1067,6 +1068,29 @@ def remove_carrier_postal_code_entry(carrier):
     return redirect(url_for("settings", section="carriers", carrier=active_carrier))
 
 
+@app.post("/settings/postnord/sign")
+def save_postnord_sign():
+    import tracking_providers.postnord as _postnord
+    sign = str(request.form.get("sign") or "").strip()
+    if not sign:
+        flash("Sign må ikke være tomt.", "error")
+        return redirect(url_for("settings", section="carriers", carrier="PostNord"))
+    env_path = ".env"
+    if os.path.exists(env_path):
+        with open(env_path, encoding="utf-8") as f:
+            content = f.read()
+        if "TRACK17_SIGN" in content:
+            content = re.sub(r"^TRACK17_SIGN=.*$", f"TRACK17_SIGN={sign}", content, flags=re.MULTILINE)
+        else:
+            content = content.rstrip("\n") + f"\nTRACK17_SIGN={sign}\n"
+        with open(env_path, "w", encoding="utf-8") as f:
+            f.write(content)
+    os.environ["TRACK17_SIGN"] = sign
+    _postnord.TRACK17_SIGN = sign
+    flash("17TRACK sign opdateret — tracking virker nu igen.", "success")
+    return redirect(url_for("settings", section="carriers", carrier="PostNord"))
+
+
 @app.post("/mail/scan")
 def scan_mail():
     try:
@@ -1156,11 +1180,13 @@ def settings():
             "auto_scan_minutes": 30,
         }
 
+    import tracking_providers.postnord as _postnord
     return render_template(
         "settings.html",
         section=section,
         active_carrier=active_carrier,
         carrier_names=SUPPORTED_CARRIER_SETTINGS,
+        track17_sign_set=bool(_postnord.TRACK17_SIGN),
         carrier_postcodes=carrier_postcodes,
         selected_postcodes=selected_postcodes,
         postal_counts=postal_counts,

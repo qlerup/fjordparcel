@@ -112,10 +112,15 @@ def main() -> None:
 
     if new_sign:
         save_sign(new_sign[0])
-        print("\nFærdig! Du kan nu genstarte appen – sign'et virker i ~1 år.")
+        print("\n" + "=" * 60)
+        print("KOPIER SIGN'ET NEDENFOR OG INDSÆT I APPEN (Indstillinger → Fragtfirmaer → PostNord):")
+        print("=" * 60)
+        print(new_sign[0])
+        print("=" * 60)
+        print("\nFærdig! Sign'et virker i ~1 år.")
     else:
-        print("\nSign ikke fanget – men browser-profilen er gemt.")
-        print("Prøv at køre appen – den bruger cookies fra profilen direkte.")
+        print("\nSign ikke fanget – prøv igen.")
+        sys.exit(1)
 
 
 if __name__ == "__main__":
