@@ -334,7 +334,7 @@ document.addEventListener("DOMContentLoaded", () => {
     if (s === 'running') return 'Opdaterer';
     if (s === 'stopping') return 'Stopper';
     if (s === 'stopped') return 'Stoppet';
-    if (s === 'success') return 'Fuldfort';
+    if (s === 'success') return 'Fuldført';
     if (s === 'failed') return 'Fejlede';
     return raw || 'Klar';
   }
@@ -388,7 +388,7 @@ document.addEventListener("DOMContentLoaded", () => {
   function scheduleReload() {
     if (reloadTimer) return;
     clearReconnect();
-    showStatus('Opdatering fuldfort. Genindlaeser...', 'ok');
+    showStatus('Opdatering fuldført. Genindlæser...', 'ok');
     reloadTimer = setTimeout(function () { try { window.location.reload(); } catch (e) {} }, RELOAD_DELAY_MS);
   }
 
@@ -415,7 +415,7 @@ document.addEventListener("DOMContentLoaded", () => {
       var next = String(item.next_auto_check_at || '').trim();
       var last = String(item.last_check_at || '').trim();
       if (!enabled) meta.textContent = 'Automatisk tjek er slaet fra.';
-      else if (next) meta.textContent = 'Naste tjek: ' + fmtTs(next);
+      else if (next) meta.textContent = 'Næste tjek: ' + fmtTs(next);
       else if (last) meta.textContent = 'Sidst tjekket: ' + fmtTs(last);
       else meta.textContent = '';
     }
@@ -469,7 +469,7 @@ document.addEventListener("DOMContentLoaded", () => {
       showStatus('Opdatering blev stoppet.', 'err');
     } else if (statusRaw === 'success') {
       if (shouldReload) scheduleReload();
-      else { clearReconnect(); showStatus('Opdatering fuldfort.', 'ok'); }
+      else { clearReconnect(); showStatus('Opdatering fuldført.', 'ok'); }
     } else if (statusRaw === 'failed') {
       clearReconnect();
       showStatus('Opdatering fejlede.', 'err');
