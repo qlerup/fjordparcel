@@ -1097,42 +1097,79 @@ def save_postnord_sign():
 def postnord_captcha_page():
     import tracking_providers.postnord as _postnord
 
-    sign = _postnord.TRACK17_SIGN
-    if not sign:
-        flash("Intet 17TRACK sign er konfigureret endnu. Gem et sign nedenfor, og prøv igen.", "error")
-        return redirect(url_for("settings", section="carriers", carrier="PostNord"))
-
-    _17track_headers = {
-        "Accept": "application/json",
-        "Content-Type": "application/json",
-        "Origin": "https://t.17track.net",
-        "Referer": "https://t.17track.net/",
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36",
-    }
     try:
-        body = json.dumps({"type": "17track"}).encode()
-        req = urllib.request.Request(
-            "https://t.17track.net/captcha/generate",
-            data=body,
-            method="POST",
-            headers=_17track_headers,
-        )
-        with urllib.request.urlopen(req, timeout=15) as resp:
-            captcha_resp = json.loads(resp.read().decode())
+        from playwright.sync_api import sync_playwright
+    except ImportError:
+        flash("Playwright er ikke installeret på serveren. Kør: pip install playwright && playwright install chromium", "error")
+        return redirect(url_for("settings", section="carriers", carrier="PostNord"))
+
+    profile_dir = str(_postnord.BROWSER_PROFILE_DIR)
+    captured_sign: list[str] = []
+    captcha_result: dict = {}
+
+    try:
+        with sync_playwright() as p:
+            ctx = p.chromium.launch_persistent_context(
+                profile_dir,
+                headless=True,
+                user_agent=(
+                    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                    "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36"
+                ),
+                locale="da-DK",
+                viewport={"width": 1280, "height": 900},
+            )
+
+            def on_request(req):
+                if "restapi" in req.url and req.post_data and not captured_sign:
+                    try:
+                        body = json.loads(req.post_data)
+                        s = str(body.get("sign") or "")
+                        if s:
+                            captured_sign.append(s)
+                    except Exception:
+                        pass
+
+            def on_response(resp):
+                if "captcha/generate" in resp.url and resp.status == 200 and not captcha_result:
+                    try:
+                        data = json.loads(resp.text())
+                        if int((data.get("code") or 0)) == 200:
+                            captcha_result["data"] = data["data"]
+                    except Exception:
+                        pass
+
+            page = ctx.new_page()
+            page.on("request", on_request)
+            page.on("response", on_response)
+            page.goto(
+                "https://t.17track.net/en#nums=00073215400595127740",
+                wait_until="domcontentloaded",
+                timeout=20000,
+            )
+
+            for _ in range(30):
+                page.wait_for_timeout(500)
+                if captured_sign and captcha_result:
+                    break
+
+            ctx.close()
     except Exception as exc:
-        flash(f"Kunne ikke hente captcha fra 17TRACK: {exc}", "error")
+        flash(f"Playwright fejl: {exc}", "error")
         return redirect(url_for("settings", section="carriers", carrier="PostNord"))
 
-    if int(captcha_resp.get("code") or 0) != 200:
-        flash("17TRACK returnerede en fejl ved captcha-generering.", "error")
+    if not captured_sign or not captcha_result:
+        flash("Kunne ikke hente captcha fra 17TRACK — prøv igen.", "error")
         return redirect(url_for("settings", section="carriers", carrier="PostNord"))
 
-    data = captcha_resp["data"]
-    options = [{"key": opt["key"], "image": opt["content"]} for opt in data["options"]]
+    session["captcha_sign"] = captured_sign[0]
+
+    cd = captcha_result["data"]
+    options = [{"key": opt["key"], "image": opt["content"]} for opt in cd["options"]]
     return render_template(
         "postnord_captcha.html",
-        captcha_id=data["captcha_id"],
-        prompt_image=data["prompt"],
+        captcha_id=cd["captcha_id"],
+        prompt_image=cd["prompt"],
         options=options,
     )
 
@@ -1152,10 +1189,7 @@ def postnord_captcha_verify():
         flash("Vælg mindst ét billede, før du bekræfter.", "error")
         return redirect(url_for("postnord_captcha_page"))
 
-    sign = _postnord.TRACK17_SIGN
-    if not sign:
-        flash("Intet sign konfigureret — kan ikke verificere captcha.", "error")
-        return redirect(url_for("settings", section="carriers", carrier="PostNord"))
+    sign = session.get("captcha_sign") or _postnord.TRACK17_SIGN or ""
 
     _17track_headers = {
         "Accept": "application/json",
@@ -1180,10 +1214,24 @@ def postnord_captcha_verify():
 
     code = int(verify_resp.get("code") or 0)
     if code == 200:
+        if sign:
+            env_path = ".env"
+            if os.path.exists(env_path):
+                with open(env_path, encoding="utf-8") as f:
+                    content = f.read()
+                if "TRACK17_SIGN" in content:
+                    content = re.sub(r"^TRACK17_SIGN=.*$", f"TRACK17_SIGN={sign}", content, flags=re.MULTILINE)
+                else:
+                    content = content.rstrip("\n") + f"\nTRACK17_SIGN={sign}\n"
+                with open(env_path, "w", encoding="utf-8") as f:
+                    f.write(content)
+            os.environ["TRACK17_SIGN"] = sign
+            _postnord.TRACK17_SIGN = sign
+        session.pop("captcha_sign", None)
         flash("Sign er nu aktivt — PostNord-tracking virker igen!", "success")
         return redirect(url_for("settings", section="carriers", carrier="PostNord"))
     elif code == -22:
-        flash("Forkert billeder valgt — prøv igen med et nyt billede.", "error")
+        flash("Forkerte billeder valgt — prøv igen.", "error")
         return redirect(url_for("postnord_captcha_page"))
     else:
         flash(f"17TRACK afviste verificeringen (kode {code}). Prøv igen.", "error")
