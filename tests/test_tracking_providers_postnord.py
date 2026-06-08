@@ -1,51 +1,67 @@
 from tracking_providers import postnord
 
 
-def test_encode_tracking_id_matches_known_parcelsapp_payload():
-    encoded = postnord._encode_tracking_id("00073215400595127740")
-    expected = "|||\x05\x01\x00}\x03\x02||\x03\x07\x03}\x00\x05\x05\x02|"
+def test_build_request_payload_uses_number_and_sign():
+    payload = postnord._build_request_payload("00073215400595127740", "abc-sign")
 
-    assert encoded == expected
+    assert payload["data"][0]["num"] == "00073215400595127740"
+    assert payload["data"][0]["fc"] == 0
+    assert payload["data"][0]["sc"] == 0
+    assert payload["sign"] == "abc-sign"
 
 
-def test_parse_tracking_response_maps_events_and_sender():
+def test_parse_tracking_response_maps_events_and_danish_text():
     payload = {
-        "status": "in_transit",
-        "attributes": [
-            {"title": "Sender", "value": "Proshop a/s"},
-            {"title": "Tracking number", "value": "00073215400568030824"},
-        ],
-        "states": [
+        "meta": {"code": 200, "message": "Ok"},
+        "shipments": [
             {
-                "date": "2026-06-06T09:22:10+02:00",
-                "state": "in_transit",
-                "text": "Package arrived at sorting facility",
-                "location": "Taastrup",
-            },
-            {
-                "date": "2026-06-08T11:56:40+02:00",
-                "state": "ready",
-                "text": "Package arrived at pickup point",
-                "location": "Naestved",
-            },
+                "code": 200,
+                "number": "00073215400568030824",
+                "shipment": {
+                    "latest_status": {"status": "AvailableForPickup"},
+                    "misc_info": {"service_type": "PostNord Service Point"},
+                    "tracking": {
+                        "providers": [
+                            {
+                                "provider": {"name": "PostNord Sweden"},
+                                "events": [
+                                    {
+                                        "time_iso": "2026-06-08T11:56:40+02:00",
+                                        "description": "E-mail notification has been sent to the recipient",
+                                        "location": "Denmark",
+                                        "sub_status": "AvailableForPickup_Other",
+                                    },
+                                    {
+                                        "time_iso": "2026-06-06T09:22:10+02:00",
+                                        "description": "The shipment item is under transportation",
+                                        "location": "Denmark",
+                                        "sub_status": "InTransit_Departure",
+                                    },
+                                ],
+                            }
+                        ]
+                    },
+                },
+            }
         ],
     }
 
     result = postnord._parse_tracking_response(payload, "00073215400568030824")
 
     assert result.carrier == "PostNord"
-    assert result.source == "parcelsapp"
-    assert result.summary == "Proshop a/s"
-    assert result.status == "Package arrived at pickup point"
-    assert result.status_code == "in_transit"
-    assert result.last_event_location == "Naestved"
+    assert result.source == "17track-restapi"
+    assert result.summary == "PostNord Service Point"
+    assert result.status == "e-mail-meddelelse er sendt til modtageren"
+    assert result.status_code == "AvailableForPickup"
+    assert result.last_event_location == "Danmark"
     assert result.last_event_at == "2026-06-08T11:56:40+02:00"
     assert len(result.events) == 2
-    assert result.events[0]["description"] == "Package arrived at pickup point"
+    assert result.events[0]["description"] == "e-mail-meddelelse er sendt til modtageren"
+    assert result.events[1]["description"] == "forsendelsesvaren er under transport"
 
 
-def test_parse_tracking_response_handles_no_data_error():
-    result = postnord._parse_tracking_response({"error": "NO_DATA"}, "00073215400568030824")
+def test_parse_tracking_response_handles_sign_error():
+    result = postnord._parse_tracking_response({"meta": {"code": -10, "message": ""}, "shipments": []}, "00073215400568030824")
 
     assert result.status == "Ikke fundet"
-    assert "Ingen haendelser" in result.error
+    assert "signatur" in result.error
