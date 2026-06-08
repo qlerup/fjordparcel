@@ -1221,7 +1221,7 @@ def _automation_worker():
             if cfg.get("auto_refresh_enabled"):
                 if now >= _AUTO_NEXT_REFRESH_AT:
                     try:
-                        for s in list_shipments():
+                        for s in list_shipments(include_archived=True):
                             try:
                                 refresh_shipment_tracking(s["id"])
                             except Exception:
