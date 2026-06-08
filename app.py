@@ -525,6 +525,13 @@ def _scan_messages(scan_days, progress_callback, only_today=False, provider=None
             if created:
                 created_count += 1
             if shipment and mail_ready_for_pickup:
+                refreshed = None
+                if found_key not in refreshed_keys:
+                    refreshed_keys.add(found_key)
+                    try:
+                        refreshed = refresh_shipment_tracking(shipment["id"])
+                    except Exception:
+                        refreshed = None
                 ready_text = "PostNord-pakken er klar til afhentning"
                 if candidate["carrier"] == "GLS":
                     ready_text = "GLS-pakken er klar til afhentning"
@@ -534,7 +541,13 @@ def _scan_messages(scan_days, progress_callback, only_today=False, provider=None
                     ready_text,
                     received_at,
                 )
-                refreshed_keys.add(found_key)
+                if refreshed and candidate["carrier"] == "GLS":
+                    reference_label = _gls_merchant_label_for_reference(
+                        refreshed.get("tracking_reference"),
+                        label_mentions,
+                    )
+                    if reference_label:
+                        update_shipment_auto_label(refreshed["id"], reference_label)
                 continue
             if shipment and dao_mail_event_text:
                 if found_key not in refreshed_keys:

@@ -109,8 +109,8 @@ def test_gls_scan_uses_merchant_as_label(tmp_path, monkeypatch):
     assert by_number["027624557628"]["label"] == "Magnetz og Magnordic"
     assert by_number["075624238061"]["label"] == "ELEXTRA.dk"
     assert by_number["027624557628"]["last_event_text"] == "GLS-pakken er klar til afhentning"
-    assert by_number["027624557628"]["events"] == []
-    assert refresh_calls == []
+    assert by_number["027624557628"]["events"][0]["location"] == "Ringsted, Danmark"
+    assert refresh_calls == [("027624557628", "GLS"), ("075624238061", "GLS")]
 
 
 def test_gls_scan_matches_merchant_label_by_tracking_reference(tmp_path, monkeypatch):
@@ -184,8 +184,8 @@ def test_gls_scan_matches_merchant_label_by_tracking_reference(tmp_path, monkeyp
     assert summary["found"] == 4
     assert by_number["027624557628"]["label"] == "Magnetz og Magnordic"
     assert by_number["075624238061"]["label"] == "ELEXTRA.dk"
-    assert by_number["027624557628"]["tracking_reference"] == ""
-    assert by_number["075624238061"]["tracking_reference"] == ""
+    assert by_number["027624557628"]["tracking_reference"] == "YMQHJ9AQ"
+    assert by_number["075624238061"]["tracking_reference"] == "YOXVB8CE"
 
 
 def test_scan_updates_existing_gls_pickup_location_and_code(tmp_path, monkeypatch):
