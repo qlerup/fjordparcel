@@ -3,6 +3,7 @@ import email.utils
 import html
 import json
 import os
+import re
 import secrets
 import time
 import urllib.error
@@ -402,10 +403,14 @@ def _parse_gmail_message(message_payload):
     body_text = "\n".join(_body_chunks(payload)).strip()
     if not body_text:
         body_text = str(message_payload.get("snippet") or "")
+    raw_body = html.unescape(body_text)
+    stripped_body = re.sub(r"<[^>]+>", " ", raw_body)
+    stripped_body = re.sub(r"\s+", " ", stripped_body).strip()
 
     return {
         "subject": _header(payload, "Subject"),
-        "bodyPreview": html.unescape(body_text)[:5000],
+        "bodyPreview": raw_body[:5000],
+        "body": stripped_body[:15000],
         "receivedDateTime": _message_datetime(payload, message_payload),
         "from": {
             "emailAddress": {

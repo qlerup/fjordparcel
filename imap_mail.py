@@ -2,6 +2,7 @@ import email
 import imaplib
 import json
 import os
+import re
 from datetime import datetime, timedelta, timezone
 from email.header import decode_header
 
@@ -232,11 +233,19 @@ def _message_text(message):
     return "\n".join(chunks)
 
 
+def _strip_html(text):
+    text = re.sub(r"<[^>]+>", " ", text)
+    return re.sub(r"\s+", " ", text).strip()
+
+
 def _parse_message(raw_message):
     message = email.message_from_bytes(raw_message)
+    raw_body = _message_text(message)
+    stripped_body = _strip_html(raw_body)
     return {
         "subject": _decode_header_value(message.get("Subject", "")),
-        "bodyPreview": _message_text(message)[:5000],
+        "bodyPreview": raw_body[:5000],
+        "body": stripped_body[:15000],
         "receivedDateTime": email.utils.parsedate_to_datetime(message.get("Date")).isoformat()
         if message.get("Date")
         else None,

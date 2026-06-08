@@ -32,7 +32,7 @@ function setScanProgress(progressBox, update) {
   } else {
     progressBox.classList.remove("scan-progress-success", "scan-progress-error");
     const accountText = update.account_label ? ` for ${update.account_label}` : "";
-    detail.textContent = `FjordParcel scanner den valgte mailkonto${accountText} og checker moenstre for DAO, PostNord, Bring og GLS.`;
+    detail.textContent = `FjordParcel scanner den valgte mailkonto${accountText} og checker mønstre for DAO, PostNord, Bring og GLS.`;
   }
 }
 
