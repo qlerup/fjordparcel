@@ -218,6 +218,16 @@ def test_extracts_gls_package_number_from_ready_mail():
     assert extract_gls_mail_tracking_numbers(text) == ["027624557628"]
 
 
+def test_extracts_full_gls_package_number_when_ready_mail_uses_spaces():
+    text = (
+        "Nu kan du godt begynde at glaede dig. Din pakke fra ELEXTRA.dk "
+        "er blevet leveret af din lokale GLS-chauffoer. "
+        "GLS pakkenummer: 0756 2423 8061 er klar til afhentning"
+    )
+
+    assert extract_gls_mail_tracking_numbers(text) == ["075624238061"]
+
+
 def test_does_not_extract_gls_ready_number_without_required_delivery_phrase():
     text = "GLS: Dit pakkenummer er 027624557628 og pakken er klar til afhentning."
 

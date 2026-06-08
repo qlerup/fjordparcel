@@ -91,7 +91,7 @@ GLS_TRACK_LINK_RE = re.compile(
     re.IGNORECASE,
 )
 GLS_PAKKENUMMER_RE = re.compile(
-    r"(?:dit\s+pakkenummer\s+er|gls\s+pakkenummer\s*:)\s*(\d{8,14})\b",
+    r"(?:dit\s+pakkenummer\s+er|gls\s+pakkenummer\s*:)\s*((?:\d[\s-]?){8,24})\b",
     re.IGNORECASE,
 )
 POSTNORD_PAKKE_RE = re.compile(r"\bdin\s+pakke\s+(\d{8,24})\s+fra\b", re.IGNORECASE)
@@ -379,7 +379,9 @@ def extract_gls_mail_tracking_numbers(text):
         results = []
         for match in GLS_PAKKENUMMER_RE.finditer(plain):
             number = normalize_tracking_number(match.group(1))
-            if number and number not in seen:
+            if not (number.isdigit() and 10 <= len(number) <= 14):
+                continue
+            if number not in seen:
                 seen.add(number)
                 results.append(number)
         return results
