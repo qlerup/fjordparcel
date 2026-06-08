@@ -345,7 +345,6 @@ def _find_gls_reference_match(db, tracking_number, carrier, label, mail_received
         (normalized_label,),
     ).fetchall()
 
-    incoming_dt = _parse_datetime(mail_received_at) or datetime.min.replace(tzinfo=timezone.utc)
     matches = []
     for row in rows:
         existing_number = normalize_tracking_number(row["tracking_number"])
@@ -354,14 +353,13 @@ def _find_gls_reference_match(db, tracking_number, carrier, label, mail_received
         if existing_number.isdigit():
             continue
 
-        row_dt = _parse_datetime(row["mail_received_at"]) or datetime.min.replace(tzinfo=timezone.utc)
-        is_before_ready_mail = 1 if row_dt <= incoming_dt else 0
-        matches.append((is_before_ready_mail, row_dt, row["id"], row))
+        is_active = 1 if not str(row["archived_at"] or "") else 0
+        matches.append((is_active, row["id"], row))
 
     if not matches:
         return None
 
-    return max(matches, key=lambda item: (item[0], item[1], item[2]))[3]
+    return max(matches, key=lambda item: (item[0], item[1]))[2]
 
 
 def _cleanup_gls_reference_duplicates(db, keeper_id, tracking_number, label, mail_received_at, now_iso):
@@ -372,7 +370,6 @@ def _cleanup_gls_reference_duplicates(db, keeper_id, tracking_number, label, mai
     if not canonical_number.isdigit():
         return
 
-    incoming_dt = _parse_datetime(mail_received_at) or _parse_datetime(now_iso) or datetime.min.replace(tzinfo=timezone.utc)
     rows = db.execute(
         """
         SELECT *
@@ -387,10 +384,6 @@ def _cleanup_gls_reference_duplicates(db, keeper_id, tracking_number, label, mai
     for row in rows:
         candidate_number = normalize_tracking_number(row["tracking_number"])
         if candidate_number.isdigit() or candidate_number == canonical_number:
-            continue
-
-        row_dt = _parse_datetime(row["mail_received_at"])
-        if row_dt and abs((incoming_dt - row_dt).total_seconds()) > 10 * 24 * 60 * 60:
             continue
 
         # Delete obsolete GLS reference rows for the same shipment label after numeric package ID is known.

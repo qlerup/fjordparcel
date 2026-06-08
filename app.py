@@ -455,6 +455,7 @@ def _scan_messages(scan_days, progress_callback, only_today=False, provider=None
                 "references": extract_gls_reference_numbers(text),
             })
 
+    extracted = []
     for message in messages:
         messages_scanned += 1
         from_info = (message.get("from") or {}).get("emailAddress") or {}
@@ -476,108 +477,135 @@ def _scan_messages(scan_days, progress_callback, only_today=False, provider=None
                 if (_carrier, _num) not in seen_numbers:
                     candidates.append({"tracking_number": _num, "carrier": _carrier, "tracking_url": ""})
                     seen_numbers.add((_carrier, _num))
+
         postnord_ready_mail = is_postnord_ready_mail(text)
         gls_ready_mail = is_gls_ready_mail(text)
 
         for candidate in candidates:
-            if candidate["carrier"] not in SUPPORTED_SCAN_CARRIERS:
+            carrier = candidate.get("carrier")
+            if carrier not in SUPPORTED_SCAN_CARRIERS:
                 continue
-            candidate_key = candidate["tracking_number"]
-            label = None
-            if candidate["carrier"] == "GLS":
-                candidate_key = gls_alias_key(candidate_key) or candidate_key
-                label = extract_mail_label(candidate["carrier"], text)
-                if not label:
-                    label = _nearest_gls_merchant_label(received_at, label_mentions)
-            else:
-                label = extract_mail_label(candidate["carrier"], text)
-            pickup_location = extract_pickup_location(text, candidate["carrier"])
-            if candidate["carrier"] == "PostNord":
+
+            pickup_location = extract_pickup_location(text, carrier)
+            if carrier == "PostNord":
                 pickup_code = extract_postnord_pincode(text)
             else:
-                pickup_code = candidate.get("pickup_code") or extract_pickup_code(text, candidate["carrier"])
+                pickup_code = candidate.get("pickup_code") or extract_pickup_code(text, carrier)
+
             mail_ready_for_pickup = (
-                candidate["carrier"] == "PostNord"
-                and (candidate.get("mail_ready_for_pickup") or postnord_ready_mail)
+                carrier == "PostNord" and (candidate.get("mail_ready_for_pickup") or postnord_ready_mail)
             ) or (
-                candidate["carrier"] == "GLS"
-                and (candidate.get("mail_ready_for_pickup") or gls_ready_mail)
-            )
-            dao_mail_event_text = (
-                extract_dao_mail_event_text(text) if candidate["carrier"] == "DAO" else None
+                carrier == "GLS" and (candidate.get("mail_ready_for_pickup") or gls_ready_mail)
             )
 
-            found_key = (candidate["carrier"], candidate_key)
-            if found_key not in found_keys:
-                found_keys.add(found_key)
-                found += 1
-            created, shipment = add_shipment(
-                candidate["tracking_number"],
-                label=label,
-                source="mail",
-                carrier=candidate["carrier"],
-                mail_subject=subject,
-                mail_from=sender,
-                mail_received_at=received_at,
-                pickup_location=pickup_location,
-                pickup_code=pickup_code,
+            extracted.append(
+                {
+                    "carrier": carrier,
+                    "tracking_number": candidate.get("tracking_number"),
+                    "subject": subject,
+                    "sender": sender,
+                    "received_at": received_at,
+                    "text": text,
+                    "pickup_location": pickup_location,
+                    "pickup_code": pickup_code,
+                    "mail_ready_for_pickup": mail_ready_for_pickup,
+                    "dao_mail_event_text": extract_dao_mail_event_text(text) if carrier == "DAO" else None,
+                }
             )
-            if created:
-                created_count += 1
-            if shipment and mail_ready_for_pickup:
-                refreshed = None
-                if found_key not in refreshed_keys:
-                    refreshed_keys.add(found_key)
-                    try:
-                        refreshed = refresh_shipment_tracking(shipment["id"])
-                    except Exception:
-                        refreshed = None
-                ready_text = "PostNord-pakken er klar til afhentning"
-                if candidate["carrier"] == "GLS":
-                    ready_text = "GLS-pakken er klar til afhentning"
-                update_shipment_mail_status(
-                    shipment["id"],
-                    "Klar til afhentning",
-                    ready_text,
-                    received_at,
-                )
-                if refreshed and candidate["carrier"] == "GLS":
-                    reference_label = _gls_merchant_label_for_reference(
-                        refreshed.get("tracking_reference"),
-                        label_mentions,
-                    )
-                    if reference_label:
-                        update_shipment_auto_label(refreshed["id"], reference_label)
-                continue
-            if shipment and dao_mail_event_text:
-                if found_key not in refreshed_keys:
-                    refreshed_keys.add(found_key)
-                    try:
-                        refresh_shipment_tracking(shipment["id"])
-                    except Exception:
-                        pass
-                update_shipment_mail_status(
-                    shipment["id"],
-                    "Afhentet",
-                    dao_mail_event_text,
-                    received_at,
-                    add_event=True,
-                )
-                archive_due_delivered_shipments()
-                continue
-            if shipment and found_key not in refreshed_keys:
+
+    # Two-phase processing for GLS: process in-transit matches before ready mails.
+    def _record_priority(item):
+        if item["carrier"] == "GLS" and item["mail_ready_for_pickup"]:
+            return 2
+        return 1
+
+    for candidate in sorted(extracted, key=_record_priority):
+        carrier = candidate["carrier"]
+        candidate_key = candidate["tracking_number"]
+
+        if carrier == "GLS":
+            candidate_key = gls_alias_key(candidate_key) or candidate_key
+            label = extract_mail_label(carrier, candidate["text"])
+            if not label:
+                label = _gls_merchant_label_for_reference(candidate["tracking_number"], label_mentions)
+        else:
+            label = extract_mail_label(carrier, candidate["text"])
+
+        found_key = (carrier, candidate_key)
+        if found_key not in found_keys:
+            found_keys.add(found_key)
+            found += 1
+
+        created, shipment = add_shipment(
+            candidate["tracking_number"],
+            label=label,
+            source="mail",
+            carrier=carrier,
+            mail_subject=candidate["subject"],
+            mail_from=candidate["sender"],
+            mail_received_at=candidate["received_at"],
+            pickup_location=candidate["pickup_location"],
+            pickup_code=candidate["pickup_code"],
+        )
+        if created:
+            created_count += 1
+
+        if shipment and candidate["mail_ready_for_pickup"]:
+            refreshed = None
+            if found_key not in refreshed_keys:
                 refreshed_keys.add(found_key)
                 try:
                     refreshed = refresh_shipment_tracking(shipment["id"])
                 except Exception:
                     refreshed = None
-                if refreshed and candidate["carrier"] == "GLS":
-                    reference_label = _gls_merchant_label_for_reference(
-                        refreshed.get("tracking_reference"),
-                        label_mentions,
-                    )
-                    if reference_label:
-                        update_shipment_auto_label(refreshed["id"], reference_label)
+            ready_text = "PostNord-pakken er klar til afhentning"
+            if carrier == "GLS":
+                ready_text = "GLS-pakken er klar til afhentning"
+            update_shipment_mail_status(
+                shipment["id"],
+                "Klar til afhentning",
+                ready_text,
+                candidate["received_at"],
+            )
+            if refreshed and carrier == "GLS":
+                reference_label = _gls_merchant_label_for_reference(
+                    refreshed.get("tracking_reference"),
+                    label_mentions,
+                )
+                if reference_label:
+                    update_shipment_auto_label(refreshed["id"], reference_label)
+            continue
+
+        if shipment and candidate["dao_mail_event_text"]:
+            if found_key not in refreshed_keys:
+                refreshed_keys.add(found_key)
+                try:
+                    refresh_shipment_tracking(shipment["id"])
+                except Exception:
+                    pass
+            update_shipment_mail_status(
+                shipment["id"],
+                "Afhentet",
+                candidate["dao_mail_event_text"],
+                candidate["received_at"],
+                add_event=True,
+            )
+            archive_due_delivered_shipments()
+            continue
+
+        if shipment and found_key not in refreshed_keys:
+            refreshed_keys.add(found_key)
+            try:
+                refreshed = refresh_shipment_tracking(shipment["id"])
+            except Exception:
+                refreshed = None
+            if refreshed and carrier == "GLS":
+                reference_label = _gls_merchant_label_for_reference(
+                    refreshed.get("tracking_reference"),
+                    label_mentions,
+                )
+                if reference_label:
+                    update_shipment_auto_label(refreshed["id"], reference_label)
 
     record_scan_run("mail", messages_scanned, found, created_count)
     return {
