@@ -1207,8 +1207,9 @@ def _automation_worker():
                 if now >= _AUTO_NEXT_SCAN_AT.get(key, 0):
                     try:
                         _scan_messages(
-                            7,
+                            1,
                             lambda **_u: None,
+                            only_today=True,
                             provider=account["provider"],
                             username=account["username"],
                         )
