@@ -403,7 +403,7 @@ def test_scan_updates_existing_postnord_pickup_from_link(tmp_path, monkeypatch):
     assert updated["label"] == "Proshop a/s"
     assert updated["status"] == "Klar til afhentning"
     assert updated["last_event_text"] == "PostNord-pakken er klar til afhentning"
-    assert refresh_calls == []
+    assert refresh_calls == [("00073215400568030824", "PostNord")]
 
 
 def test_scan_updates_existing_dao_pickup_location_and_code_from_mail(tmp_path, monkeypatch):

@@ -130,6 +130,7 @@ def test_extracts_postnord_pickup_page_number():
 
     assert extract_postnord_pickup_page_details(text) == {
         "tracking_number": "00073215400568030824",
+        "pickup_code": "08241314",
     }
 
 

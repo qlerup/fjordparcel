@@ -488,7 +488,7 @@ def _scan_messages(scan_days, progress_callback, only_today=False, provider=None
 
             pickup_location = extract_pickup_location(text, carrier)
             if carrier == "PostNord":
-                pickup_code = extract_postnord_pincode(text)
+                pickup_code = candidate.get("pickup_code") or extract_postnord_pincode(text)
             else:
                 pickup_code = candidate.get("pickup_code") or extract_pickup_code(text, carrier)
 

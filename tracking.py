@@ -323,10 +323,7 @@ def extract_dao_mail_tracking_numbers(text):
     seen = set()
     results = []
     # "Afsendt" mails
-    if (
-        re.search(r"\bhar\s+netop\s+indleveret\s+en\s+pakke\b", plain, re.IGNORECASE)
-        and re.search(r"\bHa.\s+en\s+god\s+dag\b", plain, re.IGNORECASE)
-    ):
+    if re.search(r"\bhar\s+netop\s+indleveret\s+en\s+pakke\b", plain, re.IGNORECASE):
         for match in DAO_PAKKENR_RE.finditer(plain):
             number = normalize_tracking_number(match.group(1))
             if number and number not in seen:
@@ -357,8 +354,8 @@ def extract_dao_mail_tracking_numbers(text):
 def extract_bring_mail_tracking_numbers(text):
     plain = _plain_text(text)
     if not (
-        re.search(r"\bBring-appen\b", plain, re.IGNORECASE)
-        and re.search(r"\bdin\s+pakke\s+fra\b.{1,80}?\ber\s+p[åa]\s+vej\b", plain, re.IGNORECASE | re.DOTALL)
+        re.search(r"\bbring\b", plain, re.IGNORECASE)
+        and re.search(r"\bdin\s+pakke\s+fra\b", plain, re.IGNORECASE)
     ):
         return []
     raw = html.unescape(str(text or ""))
@@ -369,6 +366,13 @@ def extract_bring_mail_tracking_numbers(text):
         if number and number not in seen:
             seen.add(number)
             results.append(number)
+
+    if not results:
+        for match in re.finditer(r"\b(3\d{17}|7\d{16})\b", plain):
+            number = normalize_tracking_number(match.group(1))
+            if number and number not in seen:
+                seen.add(number)
+                results.append(number)
     return results
 
 
@@ -432,8 +436,14 @@ def extract_postnord_pickup_page_details(text):
     plain = _plain_text(text)
     number_match = POSTNORD_PICKUP_PAGE_NUMBER_RE.search(plain)
     tracking_number = normalize_tracking_number(number_match.group(1)) if number_match else None
+    pickup_code = extract_postnord_pincode(plain)
+    if not pickup_code:
+        qr_match = POSTNORD_PICKUP_QR_RE.search(plain)
+        if qr_match:
+            pickup_code = normalize_pickup_code(qr_match.group(1))
     return {
         "tracking_number": tracking_number,
+        "pickup_code": pickup_code,
     }
 
 
