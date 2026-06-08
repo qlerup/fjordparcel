@@ -273,6 +273,11 @@ def _preferred_tracking_number(existing_number, incoming_number, carrier):
     if carrier != "GLS":
         return existing_number
 
+    existing_normalized = normalize_tracking_number(existing_number)
+    incoming_normalized = normalize_tracking_number(incoming_number)
+    if (not existing_normalized.isdigit()) and incoming_normalized.isdigit():
+        return incoming_normalized
+
     existing_key = gls_alias_key(existing_number)
     incoming_key = gls_alias_key(incoming_number)
     if not existing_key or existing_key != incoming_key:
@@ -312,6 +317,52 @@ def _find_gls_alias(db, tracking_number, carrier):
             row["id"],
         ),
     )
+
+
+def _find_gls_reference_match(db, tracking_number, carrier, label, mail_received_at, pickup_location="", pickup_code=""):
+    if carrier != "GLS":
+        return None
+
+    incoming_number = normalize_tracking_number(tracking_number)
+    if not incoming_number.isdigit():
+        return None
+
+    # Only attempt this fallback for pickup-ready mails that include pickup details.
+    if not (_pickup_location_for_carrier(carrier, pickup_location) or _pickup_code_for_carrier(carrier, pickup_code)):
+        return None
+
+    normalized_label = normalize_text(label, max_length=120)
+    if not normalized_label:
+        return None
+
+    rows = db.execute(
+        """
+        SELECT *
+        FROM shipments
+        WHERE carrier = 'GLS'
+          AND COALESCE(archived_at, '') = ''
+          AND COALESCE(label, '') = ?
+        """,
+        (normalized_label,),
+    ).fetchall()
+
+    incoming_dt = _parse_datetime(mail_received_at) or datetime.min.replace(tzinfo=timezone.utc)
+    matches = []
+    for row in rows:
+        existing_number = normalize_tracking_number(row["tracking_number"])
+        if existing_number == incoming_number:
+            continue
+        if existing_number.isdigit():
+            continue
+
+        row_dt = _parse_datetime(row["mail_received_at"]) or datetime.min.replace(tzinfo=timezone.utc)
+        is_before_ready_mail = 1 if row_dt <= incoming_dt else 0
+        matches.append((is_before_ready_mail, row_dt, row["id"], row))
+
+    if not matches:
+        return None
+
+    return max(matches, key=lambda item: (item[0], item[1], item[2]))[3]
 
 
 def _refresh_existing_shipment(
@@ -662,6 +713,36 @@ def add_shipment(
             )
             shipment = db.execute("SELECT * FROM shipments WHERE id = ?", (shipment_id,)).fetchone()
             return False, row_to_dict(shipment)
+
+        reference_row = _find_gls_reference_match(
+            db,
+            number,
+            carrier_name,
+            label,
+            mail_received_at,
+            pickup_location=normalized_pickup_location,
+            pickup_code=normalized_pickup_code,
+        )
+        if reference_row:
+            try:
+                shipment_id = _refresh_existing_shipment(
+                    db,
+                    reference_row,
+                    number,
+                    label,
+                    source,
+                    carrier_name,
+                    mail_subject,
+                    mail_from,
+                    mail_received_at,
+                    normalized_pickup_location,
+                    normalized_pickup_code,
+                    now,
+                )
+                shipment = db.execute("SELECT * FROM shipments WHERE id = ?", (shipment_id,)).fetchone()
+                return False, row_to_dict(shipment)
+            except sqlite3.IntegrityError:
+                pass
 
         try:
             cursor = db.execute(

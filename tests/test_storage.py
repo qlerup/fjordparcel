@@ -318,6 +318,43 @@ def test_gls_aliases_are_merged_into_best_tracking_number(tmp_path, monkeypatch)
     assert shipments[0]["mail_received_at"] == "2026-05-29T08:55:41+00:00"
 
 
+def test_gls_ready_mail_links_numeric_number_to_existing_reference_shipment(tmp_path, monkeypatch):
+    monkeypatch.setattr(storage, "DATABASE_PATH", str(tmp_path / "fjordparcel.db"))
+    storage.init_db()
+
+    created_ref, reference = storage.add_shipment(
+        "YMQHJ9AQ",
+        label="Magnetz og Magnordic",
+        source="mail",
+        carrier="GLS",
+        mail_subject="GLS pakke",
+        mail_from="noreply@gls-denmark.com",
+        mail_received_at="2026-05-28T17:26:20+02:00",
+    )
+
+    created_ready, updated = storage.add_shipment(
+        "027624557628",
+        label="Magnetz og Magnordic",
+        source="mail",
+        carrier="GLS",
+        mail_subject="Din pakke er nu klar til afhentning",
+        mail_from="pakke-shop@pakkeshop.dk",
+        mail_received_at="2026-05-29T08:55:48+00:00",
+        pickup_location="7-Eleven Odensevej Odensevej 102 4700 Naestved",
+        pickup_code="090",
+    )
+
+    shipments = storage.list_shipments()
+
+    assert created_ref is True
+    assert created_ready is False
+    assert updated["id"] == reference["id"]
+    assert updated["tracking_number"] == "027624557628"
+    assert updated["pickup_location"] == "7-Eleven Odensevej Odensevej 102 4700 Naestved"
+    assert updated["pickup_code"] == "090"
+    assert len(shipments) == 1
+
+
 def test_init_db_dedupes_existing_gls_alias_rows(tmp_path, monkeypatch):
     db_path = tmp_path / "fjordparcel.db"
     monkeypatch.setattr(storage, "DATABASE_PATH", str(db_path))
