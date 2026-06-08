@@ -308,6 +308,12 @@ def extract_dao_mail_tracking_numbers(text):
 
 
 def extract_bring_mail_tracking_numbers(text):
+    plain = _plain_text(text)
+    if not (
+        re.search(r"\bBring-appen\b", plain, re.IGNORECASE)
+        and re.search(r"\bdin\s+pakke\s+fra\b.{1,80}?\ber\s+p[åa]\s+vej\b", plain, re.IGNORECASE | re.DOTALL)
+    ):
+        return []
     raw = html.unescape(str(text or ""))
     seen = set()
     results = []
