@@ -186,8 +186,8 @@ def extract_pickup_location(text, carrier=None):
         r"\bhentested\s*:\s*(.+?)(?=\s+(?:hentekode|sporingsnummer)\s*:|\n\s*(?:hentekode|sporingsnummer)\s*:|$)",
         r"\ber\s+klar\s+til\s+afhentning\s+i\s+pakkeshop\s+(.+?)(?=\.\s*(?:hent\s+senest|vis\s+din\s+hentekode|hold\s+nemt)\b|\n|$)",
         r"\bklar\s+til\s+at\s+blive\s+hentet\s+i\s+(.+?)(?=\.\s|\n|$)",
-        r"\bklar\s+til\s+afhentning\s+hos\s*:\s*(.+?)(?=\n\s*(?:åbningstider|aabningstider|brug\s+afhentningskode|pakken\s+skal)\b|$)",
-        r"\bpakkeshoppen\s+hos\s*:\s*(.+?)(?=\n\s*(?:dit\s+pakkenummer|når\s+du\s+henter|du\s+kan\s+hente|tak,)\b|$)",
+        r"\bklar\s+til\s+afhentning\s+hos\s*:\s*(.+?)(?=\s+(?:åbningstider|aabningstider|brug\s+afhentningskode|pakken\s+skal)\b|$)",
+        r"\bpakkeshoppen\s+hos\s*:\s*(.+?)(?=\s+(?:dit\s+pakkenummer|når\s+du\s+henter|du\s+kan\s+hente|tak,)\b|$)",
     ]
     for pattern in patterns:
         match = re.search(pattern, plain, flags=re.IGNORECASE | re.DOTALL)
