@@ -462,36 +462,19 @@ def _scan_messages(scan_days, progress_callback, only_today=False, provider=None
         received_at = message.get("receivedDateTime")
         text = _message_scan_text(message)
 
-        candidates = extract_tracking_numbers(text)
-        # Digit-only PostNord and Bring numbers from generic extraction produce too many false
-        # positives in mail context. They are handled exclusively by the dedicated extractors
-        # below which require carrier-specific guard text in the email.
-        candidates = [
-            c for c in candidates
-            if not (c.get("carrier") == "PostNord" and c["tracking_number"].isdigit())
-            and not (c.get("carrier") == "Bring" and c["tracking_number"].isdigit())
-        ]
+        candidates = []
         candidates.extend(_postnord_pickup_candidates_from_links(text))
-        _dao_seen = {c["tracking_number"] for c in candidates if c.get("carrier") == "DAO"}
-        for _dao_num in extract_dao_mail_tracking_numbers(text):
-            if _dao_num not in _dao_seen:
-                candidates.append({"tracking_number": _dao_num, "carrier": "DAO", "tracking_url": ""})
-                _dao_seen.add(_dao_num)
-        _bring_seen = {c["tracking_number"] for c in candidates if c.get("carrier") == "Bring"}
-        for _bring_num in extract_bring_mail_tracking_numbers(text):
-            if _bring_num not in _bring_seen:
-                candidates.append({"tracking_number": _bring_num, "carrier": "Bring", "tracking_url": ""})
-                _bring_seen.add(_bring_num)
-        _gls_seen = {c["tracking_number"] for c in candidates if c.get("carrier") == "GLS"}
-        for _gls_ref in extract_gls_mail_tracking_numbers(text):
-            if _gls_ref not in _gls_seen:
-                candidates.append({"tracking_number": _gls_ref, "carrier": "GLS", "tracking_url": ""})
-                _gls_seen.add(_gls_ref)
-        _pn_seen = {c["tracking_number"] for c in candidates if c.get("carrier") == "PostNord"}
-        for _pn_num in extract_postnord_mail_tracking_numbers(text):
-            if _pn_num not in _pn_seen:
-                candidates.append({"tracking_number": _pn_num, "carrier": "PostNord", "tracking_url": ""})
-                _pn_seen.add(_pn_num)
+        seen_numbers = {(c["carrier"], c["tracking_number"]) for c in candidates}
+        for _carrier, _nums in (
+            ("DAO", extract_dao_mail_tracking_numbers(text)),
+            ("Bring", extract_bring_mail_tracking_numbers(text)),
+            ("GLS", extract_gls_mail_tracking_numbers(text)),
+            ("PostNord", extract_postnord_mail_tracking_numbers(text)),
+        ):
+            for _num in _nums:
+                if (_carrier, _num) not in seen_numbers:
+                    candidates.append({"tracking_number": _num, "carrier": _carrier, "tracking_url": ""})
+                    seen_numbers.add((_carrier, _num))
         postnord_ready_mail = is_postnord_ready_mail(text)
 
         for candidate in candidates:
