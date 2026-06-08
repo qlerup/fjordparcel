@@ -463,12 +463,13 @@ def _scan_messages(scan_days, progress_callback, only_today=False, provider=None
         text = _message_scan_text(message)
 
         candidates = extract_tracking_numbers(text)
-        # Digit-only PostNord numbers from generic extraction produce too many false positives
-        # in mail context (any email mentioning "postnord" with a 13-20 digit number matches).
-        # They are handled exclusively by extract_postnord_mail_tracking_numbers below.
+        # Digit-only PostNord and Bring numbers from generic extraction produce too many false
+        # positives in mail context. They are handled exclusively by the dedicated extractors
+        # below which require carrier-specific guard text in the email.
         candidates = [
             c for c in candidates
             if not (c.get("carrier") == "PostNord" and c["tracking_number"].isdigit())
+            and not (c.get("carrier") == "Bring" and c["tracking_number"].isdigit())
         ]
         candidates.extend(_postnord_pickup_candidates_from_links(text))
         _dao_seen = {c["tracking_number"] for c in candidates if c.get("carrier") == "DAO"}
