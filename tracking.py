@@ -297,6 +297,11 @@ def extract_dao_mail_event_text(text):
 
 def extract_dao_mail_tracking_numbers(text):
     plain = _plain_text(text)
+    if not (
+        re.search(r"\bhar\s+netop\s+indleveret\s+en\s+pakke\b", plain, re.IGNORECASE)
+        and re.search(r"\bHa.\s+en\s+god\s+dag\b", plain, re.IGNORECASE)
+    ):
+        return []
     seen = set()
     results = []
     for match in DAO_PAKKENR_RE.finditer(plain):
@@ -326,6 +331,9 @@ def extract_bring_mail_tracking_numbers(text):
 
 
 def extract_gls_mail_tracking_numbers(text):
+    plain = _plain_text(text)
+    if not re.search(r"\bdin\s+pakke\s+er\s+afsendt\s+med\s+GLS\b", plain, re.IGNORECASE):
+        return []
     raw = html.unescape(str(text or ""))
     seen = set()
     results = []
