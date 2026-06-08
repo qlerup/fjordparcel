@@ -76,7 +76,7 @@ from tracking import (
     extract_postnord_pincode,
     extract_pickup_code,
     extract_pickup_location,
-    extract_tracking_numbers,
+
     gls_alias_key,
     is_postnord_ready_mail,
     normalize_gls_reference,
