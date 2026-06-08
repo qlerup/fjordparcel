@@ -504,6 +504,17 @@ def test_scan_marks_dao_udleveret_mail_as_picked_up(tmp_path, monkeypatch):
             tracking_number=number,
             status="klar til afhentning",
             last_event_text="Pakken er klar til afhentning",
+            events=[
+                {
+                    "description": "Pakken er klar til afhentning",
+                    "status": "",
+                    "date_iso": "2026-06-06T08:00:00+02:00",
+                    "display_date": "",
+                    "display_time": "",
+                    "location": "",
+                }
+            ],
+            pickup_location="7-Eleven Uno-X Odensevej, Odensevej 102, 4700 Naestved",
             tracking_url=f"https://example.test/{number}",
             source=f"{carrier}-test",
         )
@@ -522,9 +533,10 @@ def test_scan_marks_dao_udleveret_mail_as_picked_up(tmp_path, monkeypatch):
     assert summary["new_shipments"] == 0
     assert updated["status"] == "Afhentet"
     assert updated["last_event_text"] == "Pakken er udleveret"
+    assert updated["pickup_location"] == "7-Eleven Uno-X Odensevej, Odensevej 102, 4700 Naestved"
     assert updated["events"][0]["description"] == "Pakken er udleveret"
     assert updated["events"][1]["description"] == "Pakken er klar til afhentning"
-    assert refresh_calls == []
+    assert refresh_calls == [("00057151273676436276", "DAO")]
 
 
 def test_scan_updates_existing_bring_pickup_location_and_code(tmp_path, monkeypatch):

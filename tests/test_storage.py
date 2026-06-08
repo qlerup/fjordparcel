@@ -464,3 +464,31 @@ def test_refresh_shipment_tracking_uses_saved_postcodes(tmp_path, monkeypatch):
     assert updated["status_code"] == "DELIVERED"
     assert updated["tracking_source"] == "gls-rstt028"
     assert updated["events"][0]["description"] == "Pakken er leveret"
+
+
+def test_refresh_shipment_tracking_updates_pickup_location_from_provider(tmp_path, monkeypatch):
+    monkeypatch.setattr(storage, "DATABASE_PATH", str(tmp_path / "fjordparcel.db"))
+    storage.init_db()
+    _created, shipment = storage.add_shipment(
+        "00057151273676436276",
+        source="mail",
+        carrier="DAO",
+        pickup_location="Gammelt hentested fra mail",
+    )
+
+    def fake_fetch_tracking(number, carrier="", postal_codes=None, timeout=None):
+        return TrackingLookupResult(
+            carrier="DAO",
+            tracking_number=number,
+            status="Klar til afhentning",
+            last_event_text="Klar til afhentning",
+            pickup_location="7-Eleven Uno-X Odensevej, Odensevej 102, 4700 Naestved",
+            tracking_url=f"https://example.test/{number}",
+            source="dao-test",
+        )
+
+    monkeypatch.setattr(storage, "fetch_tracking", fake_fetch_tracking)
+
+    updated = storage.refresh_shipment_tracking(shipment["id"])
+
+    assert updated["pickup_location"] == "7-Eleven Uno-X Odensevej, Odensevej 102, 4700 Naestved"

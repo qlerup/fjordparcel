@@ -16,6 +16,7 @@ class TrackingLookupResult:
     last_event_text: str = ""
     last_event_location: str = ""
     events: list[dict[str, Any]] = field(default_factory=list)
+    pickup_location: str = ""
     tracking_url: str = ""
     reference_number: str = ""
     source: str = ""
@@ -32,6 +33,7 @@ class TrackingLookupResult:
             "last_event_text": self.last_event_text,
             "last_event_location": self.last_event_location,
             "events": self.events,
+            "pickup_location": self.pickup_location,
             "tracking_url": self.tracking_url,
             "reference_number": self.reference_number,
             "source": self.source,

@@ -513,6 +513,12 @@ def _scan_messages(scan_days, progress_callback, only_today=False, provider=None
                 refreshed_keys.add(found_key)
                 continue
             if shipment and dao_mail_event_text:
+                if found_key not in refreshed_keys:
+                    refreshed_keys.add(found_key)
+                    try:
+                        refresh_shipment_tracking(shipment["id"])
+                    except Exception:
+                        pass
                 update_shipment_mail_status(
                     shipment["id"],
                     "Afhentet",
@@ -521,7 +527,6 @@ def _scan_messages(scan_days, progress_callback, only_today=False, provider=None
                     add_event=True,
                 )
                 archive_due_delivered_shipments()
-                refreshed_keys.add(found_key)
                 continue
             if shipment and found_key not in refreshed_keys:
                 refreshed_keys.add(found_key)

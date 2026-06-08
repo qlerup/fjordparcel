@@ -785,19 +785,12 @@ def update_shipment_mail_status(shipment_id, status, last_event_text=None, last_
                 events = []
 
             next_event_key = normalize_key_text(next_event_text)
-            next_event_date_key = normalize_text(next_event_at, max_length=80)
 
             def is_same_event(event):
                 if not isinstance(event, dict):
                     return False
                 event_text = normalize_key_text(event.get("description") or event.get("status") or "")
-                event_date = normalize_text(
-                    event.get("date_iso") or event.get("display_date") or event.get("display_time") or "",
-                    max_length=80,
-                )
-                return event_text == next_event_key and (
-                    not next_event_date_key or not event_date or event_date == next_event_date_key
-                )
+                return event_text == next_event_key
 
             if not any(is_same_event(event) for event in events):
                 events = [
@@ -952,6 +945,10 @@ def refresh_shipment_tracking(shipment_id):
     status = normalize_text(result.status or shipment.get("status") or "Saved", max_length=160) or "Saved"
     tracking_url = normalize_text(result.tracking_url or shipment.get("tracking_url") or build_tracking_url(number, carrier), max_length=500)
     tracking_reference = normalize_text(result.reference_number or shipment.get("tracking_reference") or "", max_length=120)
+    pickup_location = _pickup_location_for_carrier(carrier, getattr(result, "pickup_location", "")) or normalize_text(
+        shipment.get("pickup_location") or "",
+        max_length=180,
+    )
     events_json = json.dumps((result.events or [])[:30], ensure_ascii=False)
     delivered_at = _delivery_fields_for_result(shipment, result, status, now)
 
@@ -966,6 +963,7 @@ def refresh_shipment_tracking(shipment_id):
                 last_event_at = ?,
                 last_event_text = ?,
                 last_event_location = ?,
+                pickup_location = ?,
                 events_json = ?,
                 tracking_url = ?,
                 tracking_reference = ?,
@@ -984,6 +982,7 @@ def refresh_shipment_tracking(shipment_id):
                 normalize_text(result.last_event_at, max_length=80),
                 normalize_text(result.last_event_text, max_length=500),
                 normalize_text(result.last_event_location, max_length=220),
+                pickup_location,
                 events_json,
                 tracking_url,
                 tracking_reference,

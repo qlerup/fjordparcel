@@ -32,7 +32,12 @@ def test_fetch_dao_tracking_reads_events(monkeypatch):
                 "description": "Paa vej til daoSHOP",
                 "raw": {"tidspunkt": "2026-06-05 07:55:52", "haendelse": "23"},
             },
-            "pickup": {"name": "7-Eleven Uno-X Odensevej", "city": "Naestved"},
+            "pickup": {
+                "name": "7-Eleven Uno-X Odensevej",
+                "address": "Odensevej 102",
+                "postnr": "4700",
+                "city": "Naestved",
+            },
         },
     }
 
@@ -45,6 +50,7 @@ def test_fetch_dao_tracking_reads_events(monkeypatch):
     assert result.status == "Paa vej til daoSHOP"
     assert result.status_code == "23"
     assert result.summary == "7-Eleven Uno-X Odensevej, Naestved"
+    assert result.pickup_location == "7-Eleven Uno-X Odensevej, Odensevej 102, 4700 Naestved"
     assert result.last_event_at == "2026-06-05T07:55:52"
     assert len(result.events) == 2
     assert result.events[0]["display_date"] == "5. jun. 2026"
