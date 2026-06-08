@@ -82,6 +82,7 @@ POSTNORD_PINCODE_RE = re.compile(
 )
 DAO_DELIVERED_EVENT_TEXT = "Pakken er udleveret"
 DAO_PAKKENR_RE = re.compile(r"\bpakkenr\.?\s*:?\s*(\d{8,24})\b", re.IGNORECASE)
+BRING_SPORINGSNR_RE = re.compile(r"\bsporingsnummer\s*:?\s*(\d{8,24})\b", re.IGNORECASE)
 
 NUMERIC_LENGTHS = {8, 9, 10, 11, 12, 13, 14, 15, 17, 18, 20, 22, 24}
 
@@ -291,6 +292,18 @@ def extract_dao_mail_tracking_numbers(text):
     seen = set()
     results = []
     for match in DAO_PAKKENR_RE.finditer(plain):
+        number = normalize_tracking_number(match.group(1))
+        if number and number not in seen:
+            seen.add(number)
+            results.append(number)
+    return results
+
+
+def extract_bring_mail_tracking_numbers(text):
+    plain = _plain_text(text)
+    seen = set()
+    results = []
+    for match in BRING_SPORINGSNR_RE.finditer(plain):
         number = normalize_tracking_number(match.group(1))
         if number and number not in seen:
             seen.add(number)

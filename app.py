@@ -63,6 +63,7 @@ from storage import (
 from tracking import (
     SUPPORTED_SCAN_CARRIERS,
     classify_shipment_status,
+    extract_bring_mail_tracking_numbers,
     extract_dao_mail_event_text,
     extract_dao_mail_tracking_numbers,
     extract_gls_mail_label,
@@ -466,6 +467,11 @@ def _scan_messages(scan_days, progress_callback, only_today=False, provider=None
             if _dao_num not in _dao_seen:
                 candidates.append({"tracking_number": _dao_num, "carrier": "DAO", "tracking_url": ""})
                 _dao_seen.add(_dao_num)
+        _bring_seen = {c["tracking_number"] for c in candidates if c.get("carrier") == "Bring"}
+        for _bring_num in extract_bring_mail_tracking_numbers(text):
+            if _bring_num not in _bring_seen:
+                candidates.append({"tracking_number": _bring_num, "carrier": "Bring", "tracking_url": ""})
+                _bring_seen.add(_bring_num)
         postnord_ready_mail = is_postnord_ready_mail(text)
 
         for candidate in candidates:
