@@ -1209,7 +1209,6 @@ def _automation_worker():
                         _scan_messages(
                             7,
                             lambda **_u: None,
-                            only_today=True,
                             provider=account["provider"],
                             username=account["username"],
                         )

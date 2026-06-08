@@ -551,6 +551,69 @@ def test_scan_marks_dao_udleveret_mail_as_picked_up(tmp_path, monkeypatch):
     assert refresh_calls == [("00057151273676436276", "DAO")]
 
 
+def test_scan_keeps_dao_delivered_status_when_older_pickup_mail_adds_code(tmp_path, monkeypatch):
+    monkeypatch.setattr(storage, "DATABASE_PATH", str(tmp_path / "fjordparcel.db"))
+    storage.init_db()
+
+    messages = [
+        {
+            "subject": "Din pakke er udleveret",
+            "from": {"emailAddress": {"address": "noreply@dao.as", "name": "dao"}},
+            "bodyPreview": (
+                "Hej Christian\n\n"
+                "Pakken er udleveret.\n"
+                "Pakkenr.: 00057151273676436276"
+            ),
+            "receivedDateTime": "2026-06-08T10:30:00+02:00",
+        },
+        {
+            "subject": "Din pakke er klar til afhentning",
+            "from": {"emailAddress": {"address": "noreply@dao.as", "name": "dao"}},
+            "bodyPreview": (
+                "Hej Christian\n\n"
+                "Din pakke 00057151273676436276 fra bent Felvø er klar til afhentning hos:\n\n"
+                "7-Eleven Uno-X Odensevej\n"
+                "Odensevej 102\n"
+                "4700 Næstved\n\n"
+                "Åbningstider:\n"
+                "Mandag: 06:00 - 22:00\n\n"
+                "Brug afhentningskode 53828 når du henter pakken."
+            ),
+            "receivedDateTime": "2026-06-06T10:30:00+02:00",
+        },
+    ]
+    refresh_calls = []
+
+    def fake_fetch_tracking(number, carrier="", postal_codes=None, timeout=None):
+        refresh_calls.append((number, carrier))
+        return TrackingLookupResult(
+            carrier=carrier,
+            tracking_number=number,
+            status="klar til afhentning",
+            last_event_text="Pakken er klar til afhentning",
+            tracking_url=f"https://example.test/{number}",
+            source=f"{carrier}-test",
+        )
+
+    monkeypatch.setattr(
+        app_module.mail_services,
+        "iter_recent_messages",
+        lambda _days, progress_callback=None: iter(messages),
+    )
+    monkeypatch.setattr(storage, "fetch_tracking", fake_fetch_tracking)
+
+    summary = app_module._scan_messages(7, lambda **_updates: None)
+    updated = storage.list_shipments(include_archived=True)[0]
+
+    assert summary["found"] == 1
+    assert updated["status"] == "Afhentet"
+    assert updated["last_event_text"] == "Pakken er udleveret"
+    assert updated["pickup_location"] == "7-Eleven Uno-X Odensevej Odensevej 102 4700 Næstved"
+    assert updated["pickup_code"] == "53828"
+    assert updated["label"] == "bent Felvø"
+    assert refresh_calls == [("00057151273676436276", "DAO")]
+
+
 def test_scan_updates_existing_bring_pickup_location_and_code(tmp_path, monkeypatch):
     monkeypatch.setattr(storage, "DATABASE_PATH", str(tmp_path / "fjordparcel.db"))
     storage.init_db()
