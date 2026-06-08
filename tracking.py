@@ -87,7 +87,7 @@ BRING_TRACKING_URL_RE = re.compile(
     re.IGNORECASE,
 )
 GLS_TRACK_LINK_RE = re.compile(
-    r"https?://[^\s<>\"']*?gls[^\s<>\"']*?[?&]match=([A-Z0-9][A-Z0-9-]{5,30})",
+    r"https?://[^\s<>\"']*?gls[^\s<>\"']*?[?&](?:match|txtRefNo)=([A-Z0-9][A-Z0-9-]{5,30})",
     re.IGNORECASE,
 )
 POSTNORD_PAKKE_RE = re.compile(r"\bdin\s+pakke\s+(\d{8,24})\s+fra\b", re.IGNORECASE)
@@ -332,7 +332,7 @@ def extract_bring_mail_tracking_numbers(text):
 
 def extract_gls_mail_tracking_numbers(text):
     plain = _plain_text(text)
-    if not re.search(r"\bdin\s+pakke\s+er\s+afsendt\s+med\s+GLS\b", plain, re.IGNORECASE):
+    if not re.search(r"\bafsendt\s+med\s+GLS\b", plain, re.IGNORECASE):
         return []
     raw = html.unescape(str(text or ""))
     seen = set()
