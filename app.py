@@ -1479,7 +1479,7 @@ def _automation_worker():
                             username=account["username"],
                         )
                     except Exception:
-                        pass
+                        app.logger.exception("Auto mail scan failed for %s/%s", account.get("provider"), account.get("username"))
                     _AUTO_NEXT_SCAN_AT[key] = now + int(scan_cfg.get("auto_scan_minutes", 30)) * 60
 
             # Auto tracking refresh (randomized interval)

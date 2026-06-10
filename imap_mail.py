@@ -264,7 +264,7 @@ def normalize_scan_days(days):
     except (TypeError, ValueError) as error:
         raise ValueError("Scan period must be a number of days.") from error
 
-    if value not in {7, 14, 21}:
+    if value not in {1, 7, 14, 21}:
         raise ValueError("Scan period must be 7, 14, or 21 days.")
     return value
 
