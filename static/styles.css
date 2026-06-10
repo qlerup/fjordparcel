@@ -1421,6 +1421,15 @@ code[hidden] {
     flex: 1 1 130px;
   }
 
+  .settings-switch .tab-indicator {
+    display: none;
+  }
+
+  .settings-switch-item.active {
+    background: var(--pine);
+    border-radius: 8px;
+  }
+
   .shell {
     width: min(100% - 20px, 1180px);
     padding-top: 18px;

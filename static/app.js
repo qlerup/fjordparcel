@@ -715,8 +715,10 @@ document.addEventListener("DOMContentLoaded", () => {
     var indicator = document.getElementById('tab-indicator');
     if (!indicator) return;
     indicator.style.transition = 'none';
-    positionTabIndicator();
-    requestAnimationFrame(function () { indicator.style.transition = ''; });
+    requestAnimationFrame(function () {
+      positionTabIndicator();
+      requestAnimationFrame(function () { indicator.style.transition = ''; });
+    });
   });
 
   window.addEventListener('resize', positionTabIndicator);
