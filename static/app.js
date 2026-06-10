@@ -698,4 +698,26 @@ document.addEventListener("DOMContentLoaded", () => {
       });
     }
   });
+
+  function positionTabIndicator() {
+    var indicator = document.getElementById('tab-indicator');
+    if (!indicator) return;
+    var bar = document.getElementById('tab-bar');
+    var active = bar && bar.querySelector('.settings-switch-item.active');
+    if (!active || !bar) return;
+    var barRect = bar.getBoundingClientRect();
+    var activeRect = active.getBoundingClientRect();
+    indicator.style.width = activeRect.width + 'px';
+    indicator.style.transform = 'translate(' + (activeRect.left - barRect.left - 6) + 'px, ' + (activeRect.top - barRect.top - 6) + 'px)';
+  }
+
+  document.addEventListener('DOMContentLoaded', function () {
+    var indicator = document.getElementById('tab-indicator');
+    if (!indicator) return;
+    indicator.style.transition = 'none';
+    positionTabIndicator();
+    requestAnimationFrame(function () { indicator.style.transition = ''; });
+  });
+
+  window.addEventListener('resize', positionTabIndicator);
 }());

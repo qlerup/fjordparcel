@@ -55,9 +55,6 @@
         {% endif %}
       </div>
       <div>{{ shipment.carrier }}</div>
-      <div>
-        <span class="source-pill">{{ shipment.source }}</span>
-      </div>
       <div class="row-actions">
         {% if shipment.is_archived %}
           <form method="post" action="{{ url_for('restore_shipment', shipment_id=shipment.id) }}" accept-charset="UTF-8">
@@ -135,11 +132,6 @@
       <strong>{{ stats.total }}</strong>
     </div>
     <div class="stat">
-      <span>Fra mail</span>
-      <strong>{{ stats.mail }}</strong>
-    </div>
-
-    <div class="stat">
       <span>Seneste scanning</span>
       <strong>
         {% if stats.latest_scan %}
@@ -181,7 +173,6 @@
         <span>Seneste hændelse</span>
         <span>Mail-dato</span>
         <span>Transportør</span>
-        <span>Kilde</span>
         <span></span>
       </div>
 

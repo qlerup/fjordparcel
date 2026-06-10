@@ -117,7 +117,7 @@ h2 {
 
 .stat-grid {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 12px;
   margin-bottom: 16px;
 }
@@ -327,7 +327,7 @@ button:disabled,
 }
 
 .shipment-table {
-  --shipment-columns: minmax(360px, 1.55fr) minmax(190px, 0.95fr) 98px 108px 72px 132px;
+  --shipment-columns: minmax(360px, 1.55fr) minmax(190px, 0.95fr) 98px 108px 132px;
   overflow: hidden;
   border: 1px solid var(--line);
   border-radius: 8px;
@@ -1019,6 +1019,7 @@ button.archive-switch {
   position: absolute;
   top: 6px;
   left: 6px;
+  width: 0;
   height: 38px;
   border-radius: 8px;
   background: var(--pine);
@@ -1382,8 +1383,7 @@ code[hidden] {
 
   .shipment-row > div:nth-child(2),
   .shipment-row > div:nth-child(3),
-  .shipment-row > div:nth-child(4),
-  .shipment-row > div:nth-child(5) {
+  .shipment-row > div:nth-child(4) {
     grid-column: 1 / 2;
   }
 
