@@ -158,19 +158,6 @@
     </div>
   </section>
 
-  <section class="toolbar">
-    <form class="add-form" method="post" action="{{ url_for('create_shipment') }}" accept-charset="UTF-8">
-      <label>
-        <span>Trackingnummer</span>
-        <input name="tracking_number" autocomplete="off" placeholder="1Z999AA10123456784" required>
-      </label>
-      <label>
-        <span>Navn</span>
-        <input name="label" autocomplete="off" placeholder="Fx tastatur, sko, dele">
-      </label>
-      <button type="submit">Tilføj</button>
-    </form>
-  </section>
 
   <section class="shipment-table" aria-label="Gemte pakker">
     {% if active_count or archived_count %}
@@ -243,7 +230,7 @@
     {% else %}
       <div class="empty-state">
         <h2>Ingen pakker endnu</h2>
-        <p>Tilføj et trackingnummer manuelt, eller forbind Hotmail og scan seneste leveringsmails.</p>
+        <p>Forbind din mailkonto og scan seneste leveringsmails for at se dine pakker her.</p>
       </div>
     {% endif %}
   </section>
