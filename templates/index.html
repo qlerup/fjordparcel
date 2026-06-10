@@ -154,6 +154,7 @@
       </strong>
       {% if stats.latest_scan %}
         <small>{{ stats.latest_scan.tracking_numbers_found }} fundet, {{ stats.latest_scan.new_shipments }} nye</small>
+        <small>{{ stats.latest_scan.created_at | dmy }} kl. {{ stats.latest_scan.created_at[11:16] }}</small>
       {% endif %}
     </div>
   </section>
