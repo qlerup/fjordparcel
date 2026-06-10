@@ -437,7 +437,7 @@ def extract_fedex_mail_tracking_numbers(text):
     plain = _plain_text(text)
     is_fedex_service_mail = bool(re.search(r"\bfedex\b", plain, re.IGNORECASE))
     is_delivery_instruction_mail = bool(FEDEX_DELIVERY_INSTRUCTION_RE.search(plain))
-    if not (is_fedex_service_mail or is_delivery_instruction_mail):
+    if not (is_fedex_service_mail and is_delivery_instruction_mail):
         return []
     seen = set()
     results = []
