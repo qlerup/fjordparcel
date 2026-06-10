@@ -58,7 +58,6 @@
       <div>
         <span class="source-pill">{{ shipment.source }}</span>
       </div>
-      <div class="muted-text">{{ shipment.last_seen_at|dmy }}</div>
       <div class="row-actions">
         {% if shipment.is_archived %}
           <form method="post" action="{{ url_for('restore_shipment', shipment_id=shipment.id) }}" accept-charset="UTF-8">
@@ -183,7 +182,6 @@
         <span>Mail-dato</span>
         <span>Transportør</span>
         <span>Kilde</span>
-        <span>Set</span>
         <span></span>
       </div>
 

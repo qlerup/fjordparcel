@@ -91,7 +91,13 @@ from tracking import (
 app = Flask(__name__)
 app.config["SECRET_KEY"] = os.getenv("SECRET_KEY", "fjordparcel-dev-secret")
 app.json.ensure_ascii = False
-APP_BUILD = os.getenv("APP_BUILD", str(int(os.path.getmtime(__file__))))
+APP_BUILD = os.getenv("APP_BUILD", str(max(
+    int(os.path.getmtime(__file__)),
+    int(os.path.getmtime(os.path.join(os.path.dirname(__file__), "static", "styles.css")))
+    if os.path.exists(os.path.join(os.path.dirname(__file__), "static", "styles.css")) else 0,
+    int(os.path.getmtime(os.path.join(os.path.dirname(__file__), "static", "app.js")))
+    if os.path.exists(os.path.join(os.path.dirname(__file__), "static", "app.js")) else 0,
+)))
 
 APP_UPDATE_SERVICE_URL = str(os.environ.get("FJORDPARCEL_UPDATER_URL", "http://fjordparcel-updater:8090") or "").strip().rstrip("/")
 try:
