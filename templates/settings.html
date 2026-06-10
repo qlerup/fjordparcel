@@ -385,38 +385,29 @@
       {% if active_carrier == 'PostNord' %}
       <div class="panel">
         <div class="panel-heading">
-          <h2>17TRACK sign</h2>
-          {% if track17_sign_set %}
+          <h2>17TRACK API-nøgle</h2>
+          {% if track17_api_key_set %}
             <span class="badge success">Konfigureret</span>
           {% else %}
             <span class="badge error">Mangler</span>
           {% endif %}
         </div>
-        {% if track17_sign_set %}
+        {% if track17_api_key_set %}
         <p class="setting-line">
-          Sign'et er konfigureret. Hvis PostNord-tracking holder op med at virke (ca. &eacute;n gang om &aring;ret), skal du forny det ved at l&oslash;se en billedg&aring;de:
+          API-nøglen er konfigureret og krypteret. PostNord-tracking er aktiv via 17TRACK API. Du kan opdatere nøglen nedenfor hvis nødvendigt.
         </p>
-        <div class="button-row">
-          <a class="button-link" href="{{ url_for('postnord_captcha_page') }}">Forny sign (l&oslash;s billedg&aring;de)</a>
-        </div>
         {% else %}
         <p class="setting-line">
-          PostNord-tracking kr&aelig;ver et 17TRACK sign. Tryk p&aring; knappen nedenfor for at l&oslash;se en simpel billedg&aring;de og aktivere tracking:
+          PostNord-tracking kræver en 17TRACK API-nøgle. Opret en gratis konto på <a href="https://www.17track.net/en/api" target="_blank" rel="noreferrer">17track.net/en/api</a>, find din nøgle under Settings og indsæt den herunder.
         </p>
-        <div class="button-row">
-          <a class="button-link" href="{{ url_for('postnord_captcha_page') }}">Aktiv&eacute;r tracking (l&oslash;s billedg&aring;de)</a>
-        </div>
         {% endif %}
-        <details style="margin-top:1rem">
-          <summary style="cursor:pointer;font-size:0.85em;color:var(--text-muted,#888)">Avanceret: inds&aelig;t sign manuelt</summary>
-          <form class="settings-form" method="post" action="{{ url_for('save_postnord_sign') }}" accept-charset="UTF-8" style="margin-top:0.75rem">
-            <label>
-              <span>17TRACK sign</span>
-              <textarea name="sign" rows="3" placeholder="Indsæt sign her..." style="font-family:monospace;font-size:0.78em;resize:vertical"></textarea>
-            </label>
-            <button type="submit">Gem sign</button>
-          </form>
-        </details>
+        <form class="settings-form" method="post" action="{{ url_for('save_track17_api_key') }}" accept-charset="UTF-8">
+          <label>
+            <span>API-nøgle</span>
+            <input type="password" name="api_key" autocomplete="off" placeholder="Indsæt din 17TRACK API-nøgle her...">
+          </label>
+          <button type="submit">Gem API-nøgle</button>
+        </form>
       </div>
       {% endif %}
 

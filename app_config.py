@@ -34,6 +34,7 @@ SENSITIVE_KEYS = {
     "client_secret",
     "google_client_id",
     "google_client_secret",
+    "track17_api_key",
 }
 
 
@@ -211,6 +212,17 @@ def load_google_settings():
             DEFAULT_GOOGLE_SETTINGS["google_max_scan_messages"],
         ),
     }
+
+
+def load_track17_settings():
+    stored = _load_secure_settings()
+    return {
+        "api_key": _first_value(stored.get("track17_api_key"), os.getenv("TRACK17_API_KEY")),
+    }
+
+
+def save_track17_api_key(api_key):
+    _save_secure_settings({"track17_api_key": str(api_key or "").strip()})
 
 
 def normalize_public_base_url(value):
