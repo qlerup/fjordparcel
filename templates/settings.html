@@ -332,60 +332,16 @@
               href="{{ url_for('settings', section='carriers', carrier=carrier_name) }}"
             >
               <strong>{{ carrier_name }}</strong>
-              <small>{{ postal_counts.get(carrier_name, 0) }} postnumre</small>
             </a>
           {% endfor %}
         </nav>
       </aside>
 
-      <div class="panel">
-        <div class="panel-heading">
-          <h2>{{ active_carrier }} indstillinger</h2>
-          {% if active_carrier == 'GLS' %}
-            <span class="badge success">Aktiv for h&aelig;ndelser</span>
-          {% else %}
-            <span class="badge">Klar til senere</span>
-          {% endif %}
-        </div>
-        <p class="setting-line">
-          Gem de postnumre du typisk bruger til {{ active_carrier }}.
-          {% if active_carrier == 'GLS' %}
-            Ved GLS-opdatering pr&oslash;ver FjordParcel disse postnumre for at hente detaljerede h&aelig;ndelser.
-          {% else %}
-            Disse postnumre bruges ikke aktivt endnu, men er klar til n&aelig;ste provider-opslag.
-          {% endif %}
-        </p>
-        <form class="postcode-add-form" method="post" action="{{ url_for('add_carrier_postal_code', carrier=active_carrier) }}" accept-charset="UTF-8">
-          <label>
-            <span>Tilf&oslash;j postnummer</span>
-            <input name="postal_code" autocomplete="off" placeholder="F.eks. 9000" required>
-          </label>
-          <button type="submit">Gem postnummer</button>
-        </form>
-        {% if selected_postcodes %}
-          <ul class="postcode-list">
-            {% for postal_code in selected_postcodes %}
-              <li>
-                <code>{{ postal_code }}</code>
-                <form method="post" action="{{ url_for('remove_carrier_postal_code_entry', carrier=active_carrier) }}" accept-charset="UTF-8">
-                  <input type="hidden" name="postal_code" value="{{ postal_code }}">
-                  <button class="danger-button small-button" type="submit">Fjern</button>
-                </form>
-              </li>
-            {% endfor %}
-          </ul>
-        {% else %}
-          <div class="setup-note">
-            <h3>Ingen postnumre endnu</h3>
-            <p>Tilf&oslash;j mindst et postnummer for at forbedre h&aelig;ndelsesopslag.</p>
-          </div>
-        {% endif %}
-      </div>
-
       {% if active_carrier == 'PostNord' %}
       <div class="panel">
         <div class="panel-heading">
           <h2>17TRACK API-nøgle</h2>
+
           {% if track17_api_key_set %}
             <span class="badge success">Konfigureret</span>
           {% else %}
@@ -408,6 +364,13 @@
           </label>
           <button type="submit">Gem API-nøgle</button>
         </form>
+      </div>
+      {% else %}
+      <div class="panel">
+        <div class="panel-heading">
+          <h2>{{ active_carrier }}</h2>
+        </div>
+        <p class="setting-line muted-text">Ingen indstillinger tilgængelige for {{ active_carrier }}.</p>
       </div>
       {% endif %}
 

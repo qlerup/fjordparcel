@@ -70,6 +70,7 @@ from tracking import (
     extract_bring_mail_tracking_numbers,
     extract_dao_mail_event_text,
     extract_dao_mail_tracking_numbers,
+    extract_fedex_mail_tracking_numbers,
     extract_gls_mail_label,
     extract_gls_mail_tracking_numbers,
     extract_postnord_mail_tracking_numbers,
@@ -488,6 +489,7 @@ def _scan_messages(scan_days, progress_callback, only_today=False, provider=None
             ("Bring", extract_bring_mail_tracking_numbers(text)),
             ("GLS", extract_gls_mail_tracking_numbers(text)),
             ("PostNord", extract_postnord_mail_tracking_numbers(text)),
+            ("FedEx", extract_fedex_mail_tracking_numbers(text)),
         ):
             for _num in _nums:
                 if (_carrier, _num) not in seen_numbers:
@@ -1161,9 +1163,6 @@ def settings():
         ),
         None,
     )
-    carrier_postcodes = list_all_carrier_postcodes()
-    selected_postcodes = carrier_postcodes.get(active_carrier, [])
-    postal_counts = {carrier_name: len(codes) for carrier_name, codes in carrier_postcodes.items()}
     automation = load_automation_settings()
     public_base_url = load_public_base_url()
     if active_mail_account:
@@ -1185,9 +1184,6 @@ def settings():
         active_carrier=active_carrier,
         carrier_names=SUPPORTED_CARRIER_SETTINGS,
         track17_api_key_set=bool(_postnord.TRACK17_API_KEY or _load_track17().get("api_key")),
-        carrier_postcodes=carrier_postcodes,
-        selected_postcodes=selected_postcodes,
-        postal_counts=postal_counts,
         public_base_url=public_base_url,
         redirect_uri=public_url_for("mail_callback"),
         google_redirect_uri=public_url_for("google_mail_callback"),

@@ -43,7 +43,7 @@ CONTEXT_KEYWORDS = {
     "budbee",
 }
 
-SUPPORTED_SCAN_CARRIERS = ("DAO", "PostNord", "Bring", "GLS")
+SUPPORTED_SCAN_CARRIERS = ("DAO", "PostNord", "Bring", "GLS", "FedEx")
 
 UPS_RE = re.compile(r"\b1Z[0-9A-Z][0-9A-Z\s-]{15,24}\b", re.IGNORECASE)
 S10_RE = re.compile(r"\b[A-Z]{2}\s?\d(?:[\s-]?\d){8}\s?[A-Z]{2}\b", re.IGNORECASE)
@@ -95,6 +95,14 @@ GLS_PAKKENUMMER_RE = re.compile(
     re.IGNORECASE,
 )
 POSTNORD_PAKKE_RE = re.compile(r"\bdin\s+pakke\s+(\d{8,24})\s+fra\b", re.IGNORECASE)
+FEDEX_TRACKING_ID_RE = re.compile(
+    r"\btracking[-\s]?id\b\s*:?\s*(\d{12}|\d{15}|\d{20})\b",
+    re.IGNORECASE,
+)
+FEDEX_SUBJECT_NUMBER_RE = re.compile(
+    r"(?:leveringsinstruktioner|forsendelse|shipment)\s+(\d{12}|\d{15}|\d{20})\b",
+    re.IGNORECASE,
+)
 POSTNORD_PICKUP_QR_RE = re.compile(
     r"\bqr[-\s]?kode\b[^0-9]{0,80}?(\d{2}(?:[\s-]\d{2}){2,5})\b",
     re.IGNORECASE | re.DOTALL,
@@ -107,6 +115,7 @@ CARRIER_KEYWORDS = {
     "PostNord": {"postnord", "post nord"},
     "Bring": {"bring", "bring.dk", "bring.no", "posten bring"},
     "GLS": {"gls", "gls-group", "gls denmark"},
+    "FedEx": {"fedex", "fedex.com", "fedex.dk"},
 }
 
 
@@ -417,6 +426,26 @@ def extract_postnord_mail_tracking_numbers(text):
         if number and number not in seen:
             seen.add(number)
             results.append(number)
+    return results
+
+
+def extract_fedex_mail_tracking_numbers(text):
+    plain = _plain_text(text)
+    if not re.search(r"\bfedex\b", plain, re.IGNORECASE):
+        return []
+    seen = set()
+    results = []
+    for match in FEDEX_TRACKING_ID_RE.finditer(plain):
+        number = normalize_tracking_number(match.group(1))
+        if number and number not in seen:
+            seen.add(number)
+            results.append(number)
+    if not results:
+        for match in FEDEX_SUBJECT_NUMBER_RE.finditer(plain):
+            number = normalize_tracking_number(match.group(1))
+            if number and number not in seen:
+                seen.add(number)
+                results.append(number)
     return results
 
 
