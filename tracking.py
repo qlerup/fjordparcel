@@ -100,7 +100,11 @@ FEDEX_TRACKING_ID_RE = re.compile(
     re.IGNORECASE,
 )
 FEDEX_SUBJECT_NUMBER_RE = re.compile(
-    r"(?:leveringsinstruktioner|forsendelse|shipment)\s+(\d{12}|\d{15}|\d{20})\b",
+    r"\bleveringsinstruktioner\s+(\d{12}|\d{15}|\d{20})\b",
+    re.IGNORECASE,
+)
+FEDEX_DELIVERY_INSTRUCTION_RE = re.compile(
+    r"\bleveringsinstruktioner\s+for\s+din\s+forsendelse\b",
     re.IGNORECASE,
 )
 POSTNORD_PICKUP_QR_RE = re.compile(
@@ -431,15 +435,19 @@ def extract_postnord_mail_tracking_numbers(text):
 
 def extract_fedex_mail_tracking_numbers(text):
     plain = _plain_text(text)
-    if not re.search(r"\bfedex\b", plain, re.IGNORECASE):
+    is_fedex_service_mail = bool(re.search(r"\bfedex\b", plain, re.IGNORECASE))
+    is_delivery_instruction_mail = bool(FEDEX_DELIVERY_INSTRUCTION_RE.search(plain))
+    if not (is_fedex_service_mail or is_delivery_instruction_mail):
         return []
     seen = set()
     results = []
+    # "Tracking-id: 872463189276" (service/tjeneste email)
     for match in FEDEX_TRACKING_ID_RE.finditer(plain):
         number = normalize_tracking_number(match.group(1))
         if number and number not in seen:
             seen.add(number)
             results.append(number)
+    # Subject: "...leveringsinstruktioner 872463189276" (first delivery instruction email)
     if not results:
         for match in FEDEX_SUBJECT_NUMBER_RE.finditer(plain):
             number = normalize_tracking_number(match.group(1))
