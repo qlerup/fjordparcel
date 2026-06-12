@@ -37,7 +37,7 @@
           "type": "path",
           "default": "/opt/fjordparcel-data",
           "hint": "Absolut sti på serveren til database og app-data"
-        },
+        }
       ]
     },
     {
