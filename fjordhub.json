@@ -11,5 +11,82 @@
   "traefik_prefix": "/parcel",
   "compose_dir_env": "FJORDPARCEL_DIR",
   "source_url": "https://github.com/qlerup/fjordparcel",
-  "sort_order": 3
+  "sort_order": 3,
+  "setup_steps": [
+    {
+      "id": "basic",
+      "title": "Grundlæggende indstillinger",
+      "fields": [
+        {
+          "key": "APP_PORT",
+          "label": "Web-port",
+          "type": "number",
+          "default": "8096",
+          "hint": "Den port du åbner i browseren"
+        },
+        {
+          "key": "TZ",
+          "label": "Tidszone",
+          "type": "text",
+          "default": "Europe/Copenhagen",
+          "hint": "Region/By-format, f.eks. Europe/Copenhagen"
+        },
+        {
+          "key": "DATA_DIR",
+          "label": "Data-mappe",
+          "type": "path",
+          "default": "/opt/fjordparcel-data",
+          "hint": "Absolut sti på serveren til database og app-data"
+        },
+        {
+          "key": "PUBLIC_BASE_URL",
+          "label": "Offentlig URL (PUBLIC_BASE_URL)",
+          "type": "url",
+          "default": "",
+          "hint": "Bruges til OAuth redirect-URI (Microsoft/Google mail), f.eks. http://10.0.0.10:8096"
+        }
+      ]
+    },
+    {
+      "id": "secrets",
+      "title": "Hemmelige nøgler",
+      "fields": [
+        {
+          "key": "SECRET_KEY",
+          "label": "Hemmelig nøgle til sessioner (SECRET_KEY)",
+          "type": "auto_secret",
+          "default": "",
+          "hint": "Bruges af Flask til at sikre cookies og sessioner. Genereres automatisk."
+        },
+        {
+          "key": "APP_ENCRYPTION_KEY",
+          "label": "Krypteringsnøgle til mail-credentials (APP_ENCRYPTION_KEY)",
+          "type": "auto_secret",
+          "default": "",
+          "hint": "Bruges til at kryptere gemte Microsoft/Google-adgangskoder. Genereres automatisk."
+        }
+      ]
+    },
+    {
+      "id": "updater",
+      "title": "Automatisk opdatering",
+      "fields": [
+        {
+          "key": "FJORDPARCEL_AUTO_UPDATE_CHECK",
+          "label": "Tjek automatisk for opdateringer",
+          "type": "toggle",
+          "default": "1",
+          "hint": "FjordParcel tjekker GitHub for nye versioner i baggrunden"
+        },
+        {
+          "key": "FJORDPARCEL_AUTO_UPDATE_CHECK_INTERVAL_MINUTES",
+          "label": "Tjek-interval (minutter)",
+          "type": "number",
+          "default": "30",
+          "hint": "Minimum 5 minutter",
+          "show_if": {"key": "FJORDPARCEL_AUTO_UPDATE_CHECK", "value": "1"}
+        }
+      ]
+    }
+  ]
 }
