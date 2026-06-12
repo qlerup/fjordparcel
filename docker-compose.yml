@@ -8,6 +8,7 @@ services:
       - "8096:8080"
     environment:
       FJORDPARCEL_UPDATER_URL: http://fjordparcel-updater:8090
+      DATA_DIR: /app/data
     volumes:
       - ${DATA_DIR:-./data}:/app/data
     restart: unless-stopped
