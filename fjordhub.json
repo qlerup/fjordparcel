@@ -38,13 +38,6 @@
           "default": "/opt/fjordparcel-data",
           "hint": "Absolut sti på serveren til database og app-data"
         },
-        {
-          "key": "PUBLIC_BASE_URL",
-          "label": "Offentlig URL (PUBLIC_BASE_URL)",
-          "type": "url",
-          "default": "",
-          "hint": "Bruges til OAuth redirect-URI (Microsoft/Google mail), f.eks. http://10.0.0.10:8096"
-        }
       ]
     },
     {
