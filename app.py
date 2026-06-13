@@ -41,6 +41,7 @@ from storage import (
     delete_shipment,
     delete_mail_account_settings,
     delete_user,
+    update_user_role,
     get_stats,
     get_user_by_username,
     has_any_user,
@@ -1276,6 +1277,7 @@ def create_user_settings():
         try:
             create_user(name, username, generate_password_hash(password), role=role)
             flash(f"Bruger '{name}' er oprettet.", "success")
+            _hub_sync_user(username, role)
         except Exception:
             flash("Brugernavnet er allerede i brug.", "error")
     else:
@@ -1301,6 +1303,79 @@ def delete_user_settings(user_id):
     delete_user(user_id)
     flash(f"Bruger '{target['name']}' er slettet.", "success")
     return redirect(url_for("settings", section="users"))
+
+
+# ── FjordHub integration ──────────────────────────────────────────────────────
+
+_FJORDHUB_API_KEY = os.environ.get("FJORDHUB_API_KEY", "")
+_FJORDHUB_URL = os.environ.get("FJORDHUB_URL", "")
+_FJORDHUB_APP_ID = os.environ.get("FJORDHUB_APP_ID", "fjordparcel")
+
+
+def _hub_authorized() -> bool:
+    if not _FJORDHUB_API_KEY:
+        return False
+    return request.headers.get("X-Hub-Key") == _FJORDHUB_API_KEY
+
+
+def _hub_sync_user(username: str, role: str) -> None:
+    if not _FJORDHUB_URL or not _FJORDHUB_API_KEY:
+        return
+    try:
+        payload = json.dumps({
+            "app_id": _FJORDHUB_APP_ID,
+            "username": username,
+            "role": role,
+        }).encode()
+        req = urllib.request.Request(
+            f"{_FJORDHUB_URL}/api/hub/user-sync", data=payload, method="POST"
+        )
+        req.add_header("Content-Type", "application/json")
+        req.add_header("X-Hub-Key", _FJORDHUB_API_KEY)
+        urllib.request.urlopen(req, timeout=3)
+    except Exception:
+        pass
+
+
+@app.route("/api/hub/users", methods=["GET", "POST"])
+def hub_users():
+    if not _hub_authorized():
+        return jsonify({"ok": False, "error": "Uautoriseret"}), 401
+    if request.method == "GET":
+        return jsonify({"ok": True, "items": list_users()})
+    data = request.get_json(silent=True) or {}
+    username = str(data.get("username") or "").strip()
+    password = str(data.get("password") or "")
+    role = str(data.get("role") or "user").strip()
+    name = str(data.get("name") or username).strip()
+    if role not in ("admin", "user"):
+        role = "user"
+    if not username or not password:
+        return jsonify({"ok": False, "error": "username og password påkrævet"}), 400
+    if len(password) < 6:
+        return jsonify({"ok": False, "error": "Adgangskode skal være mindst 6 tegn"}), 400
+    try:
+        create_user(name, username, generate_password_hash(password), role=role)
+        return jsonify({"ok": True}), 201
+    except Exception as exc:
+        if "UNIQUE" in str(exc) or "unique" in str(exc).lower():
+            return jsonify({"ok": False, "error": "Brugernavn findes allerede"}), 409
+        return jsonify({"ok": False, "error": str(exc)}), 500
+
+
+@app.route("/api/hub/users/<int:user_id>", methods=["PATCH", "DELETE"])
+def hub_user(user_id: int):
+    if not _hub_authorized():
+        return jsonify({"ok": False, "error": "Uautoriseret"}), 401
+    if request.method == "DELETE":
+        delete_user(user_id)
+        return jsonify({"ok": True})
+    data = request.get_json(silent=True) or {}
+    role = str(data.get("role") or "user").strip()
+    if role not in ("admin", "user"):
+        return jsonify({"ok": False, "error": "Ugyldig rolle"}), 400
+    update_user_role(user_id, role)
+    return jsonify({"ok": True})
 
 
 def _automation_worker():

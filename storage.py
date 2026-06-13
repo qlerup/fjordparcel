@@ -1435,3 +1435,10 @@ def list_users():
 def delete_user(user_id):
     with get_connection() as db:
         db.execute("DELETE FROM users WHERE id = ?", (int(user_id),))
+
+
+def update_user_role(user_id, role):
+    if role not in ("admin", "user"):
+        raise ValueError("Ugyldig rolle.")
+    with get_connection() as db:
+        db.execute("UPDATE users SET role=? WHERE id=?", (role, int(user_id)))
