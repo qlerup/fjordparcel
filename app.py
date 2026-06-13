@@ -4,6 +4,7 @@ import re
 import threading
 import time
 import urllib.error
+import urllib.parse
 import urllib.request
 import uuid
 import atexit
@@ -177,6 +178,13 @@ def _setup_locked_response():
 @app.before_request
 def require_auth():
     if request.endpoint in _AUTH_EXEMPT or request.endpoint is None:
+        return
+    if _fjordhub_managed():
+        if "user_id" not in session:
+            return redirect(url_for("login"))
+        if request.endpoint in _ADMIN_ONLY_ENDPOINTS and session.get("role") != "admin":
+            flash("Du har ikke adgang til indstillinger.", "error")
+            return redirect(url_for("index"))
         return
     if not has_any_user():
         if install_state_exists():
@@ -716,7 +724,7 @@ def setup():
     if has_any_user():
         ensure_install_state_for_existing_users()
         return redirect(url_for("index"))
-    if _FJORDHUB_API_KEY:
+    if _fjordhub_managed():
         return redirect(url_for("login"))
     if install_state_exists():
         return _setup_locked_response()
@@ -752,6 +760,21 @@ def setup():
 
 @app.route("/login", methods=["GET", "POST"])
 def login():
+    if _fjordhub_managed():
+        if "user_id" in session:
+            return redirect(url_for("index"))
+        if request.method == "POST":
+            username = request.form.get("username", "").strip()
+            password = request.form.get("password", "")
+            user = _hub_authenticate(username, password)
+            if user:
+                session["hub_user_id"] = int(user["id"])
+                session["user_id"] = str(user["username"]).strip().lower()
+                session["user_name"] = str(user.get("name") or user["username"])
+                session["role"] = "admin" if user.get("role") == "admin" else "user"
+                return redirect(url_for("index"))
+            flash("Forkert brugernavn/adgangskode eller ingen adgang til FjordParcel.", "error")
+        return render_template("auth.html", mode="login")
     if not has_any_user():
         if install_state_exists():
             return _setup_locked_response()
@@ -1235,7 +1258,7 @@ def settings():
         requested_mail_provider=requested_mail_provider,
         setup_provider=setup_provider,
         edit_app_registration=edit_app_registration,
-        users=list_users(),
+        users=_app_users(),
     )
 
 
@@ -1269,6 +1292,17 @@ def create_user_settings():
     role = request.form.get("role", "user")
     if role not in ("admin", "user"):
         role = "user"
+    if _fjordhub_managed():
+        if password != password2:
+            flash("Adgangskoderne matcher ikke.", "error")
+            return redirect(url_for("settings", section="users"))
+        payload = {"username": username, "password": password, "role": role, "name": name}
+        result = _hub_create_user(payload)
+        if result.get("ok"):
+            flash(f"Bruger '{name or username}' er oprettet i FjordHub med adgang til FjordParcel.", "success")
+        else:
+            flash(str(result.get("error") or "Kunne ikke oprette bruger i FjordHub."), "error")
+        return redirect(url_for("settings", section="users"))
     errors = []
     if not name:
         errors.append("Navn er påkrævet.")
@@ -1295,6 +1329,16 @@ def create_user_settings():
 
 @app.post("/settings/users/<int:user_id>/delete")
 def delete_user_settings(user_id):
+    if _fjordhub_managed():
+        if int(user_id) == int(session.get("hub_user_id") or 0):
+            flash("Du kan ikke fjerne din egen adgang.", "error")
+            return redirect(url_for("settings", section="users"))
+        result = _hub_delete_user_access(user_id)
+        if result.get("ok"):
+            flash("Brugeradgang er fjernet i FjordHub.", "success")
+        else:
+            flash(str(result.get("error") or "Kunne ikke fjerne brugeradgang."), "error")
+        return redirect(url_for("settings", section="users"))
     if str(user_id) == str(session.get("user_id", "")):
         flash("Du kan ikke slette din egen bruger.", "error")
         return redirect(url_for("settings", section="users"))
@@ -1319,35 +1363,92 @@ _FJORDHUB_URL = os.environ.get("FJORDHUB_URL", "")
 _FJORDHUB_APP_ID = os.environ.get("FJORDHUB_APP_ID", "fjordparcel")
 
 
+def _fjordhub_managed() -> bool:
+    return bool(_FJORDHUB_URL and _FJORDHUB_API_KEY and _FJORDHUB_APP_ID)
+
+
 def _hub_authorized() -> bool:
     if not _FJORDHUB_API_KEY:
         return False
     return request.headers.get("X-Hub-Key") == _FJORDHUB_API_KEY
 
 
-def _hub_sync_user(username: str, role: str) -> None:
-    if not _FJORDHUB_URL or not _FJORDHUB_API_KEY:
-        return
-    try:
-        payload = json.dumps({
-            "app_id": _FJORDHUB_APP_ID,
-            "username": username,
-            "role": role,
-        }).encode()
-        req = urllib.request.Request(
-            f"{_FJORDHUB_URL}/api/hub/user-sync", data=payload, method="POST"
-        )
+def _hub_api(path: str, payload: dict | None = None, method: str = "POST") -> dict:
+    if not _fjordhub_managed():
+        return {"ok": False, "error": "FjordHub integration er ikke aktiv."}
+    method = method.upper()
+    data = dict(payload or {})
+    data.setdefault("app_id", _FJORDHUB_APP_ID)
+    url = f"{_FJORDHUB_URL.rstrip('/')}{path}"
+    body = None
+    if method == "GET":
+        url = f"{url}?{urllib.parse.urlencode(data)}"
+    else:
+        body = json.dumps(data).encode("utf-8")
+    req = urllib.request.Request(url, data=body, method=method)
+    req.add_header("X-Hub-Key", _FJORDHUB_API_KEY)
+    if body is not None:
         req.add_header("Content-Type", "application/json")
-        req.add_header("X-Hub-Key", _FJORDHUB_API_KEY)
-        urllib.request.urlopen(req, timeout=3)
-    except Exception:
-        pass
+    try:
+        with urllib.request.urlopen(req, timeout=6) as resp:
+            return json.loads(resp.read().decode("utf-8") or "{}")
+    except urllib.error.HTTPError as exc:
+        try:
+            return json.loads(exc.read().decode("utf-8") or "{}")
+        except Exception:
+            return {"ok": False, "error": f"FjordHub svarede HTTP {exc.code}"}
+    except Exception as exc:
+        return {"ok": False, "error": f"Kunne ikke kontakte FjordHub: {exc}"}
+
+
+def _hub_authenticate(username: str, password: str) -> dict | None:
+    result = _hub_api(
+        "/api/hub/apps/authenticate",
+        {"username": username, "password": password},
+    )
+    return result.get("user") if result.get("ok") and isinstance(result.get("user"), dict) else None
+
+
+def _hub_create_user(payload: dict) -> dict:
+    return _hub_api("/api/hub/apps/users", payload, method="POST")
+
+
+def _hub_delete_user_access(user_id: int) -> dict:
+    return _hub_api(f"/api/hub/apps/users/{int(user_id)}", {}, method="DELETE")
+
+
+def _app_users() -> list[dict]:
+    if not _fjordhub_managed():
+        return list_users()
+    result = _hub_api("/api/hub/apps/users", {}, method="GET")
+    if not result.get("ok"):
+        flash(str(result.get("error") or "Kunne ikke hente brugere fra FjordHub."), "error")
+        return []
+    return [
+        {
+            "id": item.get("id"),
+            "name": item.get("username"),
+            "username": item.get("username"),
+            "role": item.get("role") or "user",
+            "created_at": item.get("created_at") or "",
+        }
+        for item in result.get("items", [])
+        if isinstance(item, dict)
+    ]
+
+
+def _hub_sync_user(username: str, role: str) -> None:
+    if not _fjordhub_managed():
+        return
+    _hub_create_user({"username": username, "role": role})
 
 
 @app.route("/api/hub/users", methods=["GET", "POST"])
 def hub_users():
     if not _hub_authorized():
         return jsonify({"ok": False, "error": "Uautoriseret"}), 401
+    if _fjordhub_managed():
+        return jsonify({"ok": False, "error": "Lokal bruger-provisionering er slået fra i FjordHub-managed mode."}), 410
     if request.method == "GET":
         return jsonify({"ok": True, "items": list_users()})
     data = request.get_json(silent=True) or {}
@@ -1374,6 +1475,8 @@ def hub_users():
 def hub_user(user_id: int):
     if not _hub_authorized():
         return jsonify({"ok": False, "error": "Uautoriseret"}), 401
+    if _fjordhub_managed():
+        return jsonify({"ok": False, "error": "Lokal bruger-provisionering er slået fra i FjordHub-managed mode."}), 410
     if request.method == "DELETE":
         delete_user(user_id)
         return jsonify({"ok": True})

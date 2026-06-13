@@ -6,6 +6,8 @@ services:
       - .env
     ports:
       - "8096:8080"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     environment:
       FJORDPARCEL_UPDATER_URL: http://fjordparcel-updater:8090
       DATA_DIR: /app/data
