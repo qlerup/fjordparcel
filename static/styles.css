@@ -1243,6 +1243,14 @@ button.archive-switch {
   margin-bottom: 16px;
 }
 
+.panel-badges {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
 .setting-line {
   color: var(--muted);
 }
@@ -1548,6 +1556,18 @@ code[hidden] {
 
 .user-table tbody tr:last-child td {
   border-bottom: none;
+}
+
+.managed-note {
+  margin: -6px 0 14px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 10px 12px;
+  background: var(--surface-strong);
+  color: var(--muted);
+  font-size: 0.9rem;
+  font-weight: 700;
+  line-height: 1.45;
 }
 
 .user-actions {

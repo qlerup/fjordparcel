@@ -1259,6 +1259,7 @@ def settings():
         setup_provider=setup_provider,
         edit_app_registration=edit_app_registration,
         users=_app_users(),
+        fjordhub_managed=_fjordhub_managed(),
     )
 
 
@@ -1293,15 +1294,7 @@ def create_user_settings():
     if role not in ("admin", "user"):
         role = "user"
     if _fjordhub_managed():
-        if password != password2:
-            flash("Adgangskoderne matcher ikke.", "error")
-            return redirect(url_for("settings", section="users"))
-        payload = {"username": username, "password": password, "role": role, "name": name}
-        result = _hub_create_user(payload)
-        if result.get("ok"):
-            flash(f"Bruger '{name or username}' er oprettet i FjordHub med adgang til FjordParcel.", "success")
-        else:
-            flash(str(result.get("error") or "Kunne ikke oprette bruger i FjordHub."), "error")
+        flash("Brugere håndteres igennem FjordHub.", "error")
         return redirect(url_for("settings", section="users"))
     errors = []
     if not name:
@@ -1330,14 +1323,7 @@ def create_user_settings():
 @app.post("/settings/users/<int:user_id>/delete")
 def delete_user_settings(user_id):
     if _fjordhub_managed():
-        if int(user_id) == int(session.get("hub_user_id") or 0):
-            flash("Du kan ikke fjerne din egen adgang.", "error")
-            return redirect(url_for("settings", section="users"))
-        result = _hub_delete_user_access(user_id)
-        if result.get("ok"):
-            flash("Brugeradgang er fjernet i FjordHub.", "success")
-        else:
-            flash(str(result.get("error") or "Kunne ikke fjerne brugeradgang."), "error")
+        flash("Brugere håndteres igennem FjordHub.", "error")
         return redirect(url_for("settings", section="users"))
     if str(user_id) == str(session.get("user_id", "")):
         flash("Du kan ikke slette din egen bruger.", "error")

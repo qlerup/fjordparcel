@@ -383,8 +383,16 @@
       <div class="panel">
         <div class="panel-heading">
           <h2>Brugere</h2>
-          <span class="badge success">{{ users|length }} bruger{{ 'e' if users|length != 1 else '' }}</span>
+          <div class="panel-badges">
+            {% if fjordhub_managed %}
+              <span class="badge warning">Håndteret igennem FjordHub</span>
+            {% endif %}
+            <span class="badge success">{{ users|length }} bruger{{ 'e' if users|length != 1 else '' }}</span>
+          </div>
         </div>
+        {% if fjordhub_managed %}
+          <p class="managed-note">Håndteret igennem FjordHub. Du kan se brugerne her, men oprettelse og sletning styres i FjordHub.</p>
+        {% endif %}
         <table class="user-table">
           <thead>
             <tr>
@@ -405,57 +413,67 @@
                   </span>
                 </td>
                 <td class="user-actions">
-                  <form method="post" action="{{ url_for('delete_user_settings', user_id=user.id) }}" accept-charset="UTF-8" onsubmit="return confirm('Slet {{ user.name }}?')">
-                    <button class="danger-button small-button" type="submit">Slet</button>
-                  </form>
+                  {% if fjordhub_managed %}
+                    <button class="danger-button small-button" type="button" disabled title="Håndteret igennem FjordHub">Slet</button>
+                  {% else %}
+                    <form method="post" action="{{ url_for('delete_user_settings', user_id=user.id) }}" accept-charset="UTF-8" onsubmit="return confirm('Slet {{ user.name }}?')">
+                      <button class="danger-button small-button" type="submit">Slet</button>
+                    </form>
+                  {% endif %}
                 </td>
               </tr>
             {% endfor %}
           </tbody>
         </table>
         <div class="button-row" style="margin-top:18px">
-          <button type="button" class="button-link" onclick="document.getElementById('create-user-modal').showModal()">Opret bruger</button>
+          {% if fjordhub_managed %}
+            <button type="button" class="button-link" disabled title="Håndteret igennem FjordHub">Opret bruger</button>
+          {% else %}
+            <button type="button" class="button-link" onclick="document.getElementById('create-user-modal').showModal()">Opret bruger</button>
+          {% endif %}
         </div>
       </div>
     </section>
 
-    <dialog id="create-user-modal" class="user-modal">
-      <div class="user-modal-inner">
-        <div class="user-modal-head">
-          <h2>Opret bruger</h2>
-          <button type="button" class="modal-close" onclick="document.getElementById('create-user-modal').close()" aria-label="Luk">&times;</button>
+    {% if not fjordhub_managed %}
+      <dialog id="create-user-modal" class="user-modal">
+        <div class="user-modal-inner">
+          <div class="user-modal-head">
+            <h2>Opret bruger</h2>
+            <button type="button" class="modal-close" onclick="document.getElementById('create-user-modal').close()" aria-label="Luk">&times;</button>
+          </div>
+          <form method="post" action="{{ url_for('create_user_settings') }}" class="auth-form" autocomplete="off" accept-charset="UTF-8">
+            <div class="auth-field">
+              <label for="cu-name">Navn</label>
+              <input id="cu-name" name="name" type="text" required placeholder="Fulde navn">
+            </div>
+            <div class="auth-field">
+              <label for="cu-username">Brugernavn</label>
+              <input id="cu-username" name="username" type="text" required placeholder="fx bruger1">
+            </div>
+            <div class="auth-field">
+              <label for="cu-password">Adgangskode</label>
+              <input id="cu-password" name="password" type="password" required placeholder="Mindst 6 tegn">
+            </div>
+            <div class="auth-field">
+              <label for="cu-password2">Gentag adgangskode</label>
+              <input id="cu-password2" name="password2" type="password" required placeholder="Gentag adgangskoden">
+            </div>
+            <div class="auth-field">
+              <label for="cu-role">Rolle</label>
+              <select id="cu-role" name="role">
+                <option value="admin">Admin – fuld adgang</option>
+                <option value="user" selected>Bruger – ingen adgang til indstillinger</option>
+              </select>
+            </div>
+            <div class="button-row" style="margin-top:6px">
+              <button type="submit">Opret bruger</button>
+              <button type="button" class="button-link secondary-button" onclick="document.getElementById('create-user-modal').close()">Annuller</button>
+            </div>
+          </form>
         </div>
-        <form method="post" action="{{ url_for('create_user_settings') }}" class="auth-form" autocomplete="off" accept-charset="UTF-8">
-          <div class="auth-field">
-            <label for="cu-name">Navn</label>
-            <input id="cu-name" name="name" type="text" required placeholder="Fulde navn">
-          </div>
-          <div class="auth-field">
-            <label for="cu-username">Brugernavn</label>
-            <input id="cu-username" name="username" type="text" required placeholder="fx bruger1">
-          </div>
-          <div class="auth-field">
-            <label for="cu-password">Adgangskode</label>
-            <input id="cu-password" name="password" type="password" required placeholder="Mindst 6 tegn">
-          </div>
-          <div class="auth-field">
-            <label for="cu-password2">Gentag adgangskode</label>
-            <input id="cu-password2" name="password2" type="password" required placeholder="Gentag adgangskoden">
-          </div>
-          <div class="auth-field">
-            <label for="cu-role">Rolle</label>
-            <select id="cu-role" name="role">
-              <option value="admin">Admin – fuld adgang</option>
-              <option value="user" selected>Bruger – ingen adgang til indstillinger</option>
-            </select>
-          </div>
-          <div class="button-row" style="margin-top:6px">
-            <button type="submit">Opret bruger</button>
-            <button type="button" class="button-link secondary-button" onclick="document.getElementById('create-user-modal').close()">Annuller</button>
-          </div>
-        </form>
-      </div>
-    </dialog>
+      </dialog>
+    {% endif %}
   </div>
 
   {# ── Update ───────────────────────────────────────────── #}
