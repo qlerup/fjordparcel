@@ -716,6 +716,8 @@ def setup():
     if has_any_user():
         ensure_install_state_for_existing_users()
         return redirect(url_for("index"))
+    if _FJORDHUB_API_KEY:
+        return redirect(url_for("login"))
     if install_state_exists():
         return _setup_locked_response()
     if request.method == "POST":
@@ -753,7 +755,8 @@ def login():
     if not has_any_user():
         if install_state_exists():
             return _setup_locked_response()
-        return redirect(url_for("setup"))
+        if not _FJORDHUB_API_KEY:
+            return redirect(url_for("setup"))
     ensure_install_state_for_existing_users()
     if "user_id" in session:
         return redirect(url_for("index"))
