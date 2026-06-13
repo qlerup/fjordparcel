@@ -135,7 +135,7 @@ _AUTO_HEARTBEAT_INTERVAL_SECONDS = max(3, int(str(os.getenv("FJORDPARCEL_AUTOMAT
 _AUTO_NEXT_HEARTBEAT_AT = 0.0
 
 _AUTH_EXEMPT = frozenset({
-    "setup", "login", "logout",
+    "setup", "login", "logout", "hub_login",
     "api_health",
     "favicon_ico", "favicon_32_png", "favicon_16_png",
     "apple_touch_icon", "site_webmanifest",
@@ -800,6 +800,29 @@ def login():
 def logout():
     session.clear()
     return redirect(url_for("login"))
+
+
+@app.route("/hub-login")
+def hub_login():
+    if not _fjordhub_managed():
+        return redirect(url_for("login"))
+    token = request.args.get("token", "").strip()
+    if not token:
+        return redirect(url_for("login"))
+    result = _hub_api("/api/hub/sso-verify", {"token": token}, method="GET")
+    if not result.get("ok"):
+        return redirect(url_for("login"))
+    username = str(result.get("username") or "").strip()
+    role = str(result.get("role") or "user").strip()
+    hub_user_id = result.get("id")
+    if not username:
+        return redirect(url_for("login"))
+    session["user_id"] = username.lower()
+    session["user_name"] = username
+    session["role"] = role
+    if hub_user_id:
+        session["hub_user_id"] = int(hub_user_id)
+    return redirect(url_for("index"))
 
 
 @app.route("/favicon.ico")
