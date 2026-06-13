@@ -181,6 +181,10 @@ def require_auth():
     if not has_any_user():
         if install_state_exists():
             return _setup_locked_response()
+        if _FJORDHUB_API_KEY:
+            if request.endpoint != "login":
+                return redirect(url_for("login"))
+            return None
         return redirect(url_for("setup"))
     ensure_install_state_for_existing_users()
     if "user_id" not in session:
