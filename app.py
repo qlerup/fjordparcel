@@ -44,13 +44,17 @@ from storage import (
     get_stats,
     get_user_by_username,
     has_any_user,
+    ensure_install_state_for_existing_users,
     init_db,
+    install_state_db_path,
+    install_state_exists,
     list_enabled_mail_account_scans,
     list_all_carrier_postcodes,
     list_shipments,
     list_users,
     load_mail_account_settings,
     normalize_settings_carrier,
+    mark_install_initialized,
     record_scan_run,
     release_automation_leader_lock,
     refresh_shipment_tracking,
@@ -108,6 +112,7 @@ except Exception:
 APP_UPDATE_SERVICE_TIMEOUT_SEC = max(2.0, min(120.0, APP_UPDATE_SERVICE_TIMEOUT_SEC))
 
 init_db()
+ensure_install_state_for_existing_users()
 
 SCAN_JOBS = {}
 SCAN_JOBS_LOCK = threading.Lock()
@@ -129,6 +134,7 @@ _AUTO_NEXT_HEARTBEAT_AT = 0.0
 
 _AUTH_EXEMPT = frozenset({
     "setup", "login", "logout",
+    "api_health",
     "favicon_ico", "favicon_32_png", "favicon_16_png",
     "apple_touch_icon", "site_webmanifest",
     "manifest_webmanifest", "browserconfig_xml",
@@ -156,12 +162,26 @@ _ADMIN_ONLY_ENDPOINTS = frozenset({
 })
 
 
+def _setup_locked_response():
+    message = "FjordParcel er allerede initialiseret, men databasen mangler eller er tom."
+    if request.path.startswith("/api/"):
+        return jsonify({"ok": False, "error": message, "recovery_required": True}), 503
+    return render_template(
+        "auth.html",
+        mode="setup_locked",
+        db_path=install_state_db_path(),
+    ), 503
+
+
 @app.before_request
 def require_auth():
     if request.endpoint in _AUTH_EXEMPT or request.endpoint is None:
         return
     if not has_any_user():
+        if install_state_exists():
+            return _setup_locked_response()
         return redirect(url_for("setup"))
+    ensure_install_state_for_existing_users()
     if "user_id" not in session:
         return redirect(url_for("login"))
     if "role" not in session:
@@ -689,7 +709,10 @@ def inject_globals():
 @app.route("/setup", methods=["GET", "POST"])
 def setup():
     if has_any_user():
+        ensure_install_state_for_existing_users()
         return redirect(url_for("index"))
+    if install_state_exists():
+        return _setup_locked_response()
     if request.method == "POST":
         name = request.form.get("name", "").strip()
         username = request.form.get("username", "").strip()
@@ -711,6 +734,7 @@ def setup():
                 flash(error, "error")
             return render_template("auth.html", mode="setup", form_name=name, form_username=username)
         create_user(name, username, generate_password_hash(password), role="admin")
+        mark_install_initialized("first-admin-created")
         session["user_id"] = username.lower()
         session["user_name"] = name
         session["role"] = "admin"
@@ -722,7 +746,10 @@ def setup():
 @app.route("/login", methods=["GET", "POST"])
 def login():
     if not has_any_user():
+        if install_state_exists():
+            return _setup_locked_response()
         return redirect(url_for("setup"))
+    ensure_install_state_for_existing_users()
     if "user_id" in session:
         return redirect(url_for("index"))
     if request.method == "POST":

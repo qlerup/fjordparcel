@@ -2,6 +2,7 @@ import json
 import os
 import re
 import sqlite3
+import threading
 import unicodedata
 from datetime import datetime, timedelta, timezone
 
@@ -20,6 +21,11 @@ from tracking_providers import TrackingLookupResult, fetch_tracking
 
 
 DATABASE_PATH = os.getenv("DATABASE_PATH", os.path.join("data", "fjordparcel.db"))
+INSTALL_STATE_PATH = os.getenv(
+    "INSTALL_STATE_PATH",
+    os.path.join(os.path.dirname(DATABASE_PATH) or ".", "fjordparcel.install.json"),
+)
+INSTALL_STATE_LOCK = threading.Lock()
 SUPPORTED_CARRIER_SETTINGS = tuple(SUPPORTED_SCAN_CARRIERS)
 DELIVERED_ARCHIVE_AFTER = timedelta(hours=24)
 AUTOMATION_LOCK_NAME = "automation-worker"
@@ -58,6 +64,43 @@ def _utc_now_datetime():
 
 def utc_now():
     return _utc_now_datetime().isoformat()
+
+
+def install_state_exists():
+    return os.path.exists(INSTALL_STATE_PATH)
+
+
+def install_state_db_path():
+    return DATABASE_PATH
+
+
+def mark_install_initialized(reason="unknown"):
+    if install_state_exists():
+        return
+    with INSTALL_STATE_LOCK:
+        if install_state_exists():
+            return
+        payload = {
+            "app": "fjordparcel",
+            "initialized": True,
+            "initialized_at": utc_now(),
+            "reason": str(reason or "unknown"),
+            "db_path": DATABASE_PATH,
+        }
+        state_dir = os.path.dirname(INSTALL_STATE_PATH) or "."
+        os.makedirs(state_dir, exist_ok=True)
+        tmp_path = os.path.join(state_dir, f".{os.path.basename(INSTALL_STATE_PATH)}.{os.getpid()}.tmp")
+        with open(tmp_path, "w", encoding="utf-8") as fh:
+            json.dump(payload, fh, indent=2, ensure_ascii=False)
+        os.replace(tmp_path, INSTALL_STATE_PATH)
+
+
+def ensure_install_state_for_existing_users():
+    try:
+        if has_any_user():
+            mark_install_initialized("existing-users")
+    except Exception:
+        pass
 
 
 def get_connection():

@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>{% if mode == 'setup' %}Opret admin bruger{% else %}Log ind{% endif %} – FjordParcel</title>
+    <title>{% if mode == 'setup' %}Opret admin bruger{% elif mode == 'setup_locked' %}Recovery kraeves{% else %}Log ind{% endif %} – FjordParcel</title>
     <link rel="icon" href="{{ url_for('static', filename='logos/web/favicon.ico', v=app_build) }}" sizes="any">
     <link rel="stylesheet" href="{{ url_for('static', filename='styles.css', v=app_build) }}">
   </head>
@@ -24,7 +24,16 @@
           {% endif %}
         {% endwith %}
 
-        {% if mode == 'setup' %}
+        {% if mode == 'setup_locked' %}
+          <h1 class="auth-heading">Recovery kraeves</h1>
+          <p class="auth-sub">FjordParcel er allerede initialiseret, men databasen mangler eller er tom.</p>
+          <div class="flash-stack" aria-live="polite">
+            <div class="flash flash-error">
+              Af sikkerhedsgrunde er foerste opsaetning lukket. Gendan databasen fra backup eller kontroller data-mountet.
+            </div>
+          </div>
+          <p class="auth-sub">Database: {{ db_path }}</p>
+        {% elif mode == 'setup' %}
           <h1 class="auth-heading">Opret admin bruger</h1>
           <p class="auth-sub">Opret den første bruger for at komme i gang.</p>
           <form method="post" action="{{ url_for('setup') }}" class="auth-form" autocomplete="off" accept-charset="UTF-8">
