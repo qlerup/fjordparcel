@@ -384,9 +384,6 @@
         <div class="panel-heading">
           <h2>Brugere</h2>
           <div class="panel-badges">
-            {% if fjordhub_managed %}
-              <span class="badge warning">Håndteret igennem FjordHub</span>
-            {% endif %}
             <span class="badge success">{{ users|length }} bruger{{ 'e' if users|length != 1 else '' }}</span>
           </div>
         </div>
