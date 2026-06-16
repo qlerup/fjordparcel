@@ -1316,9 +1316,6 @@ def create_user_settings():
     role = request.form.get("role", "user")
     if role not in ("admin", "user"):
         role = "user"
-    if _fjordhub_managed():
-        flash("Brugere håndteres igennem FjordHub.", "error")
-        return redirect(url_for("settings", section="users"))
     errors = []
     if not name:
         errors.append("Navn er påkrævet.")
@@ -1332,9 +1329,22 @@ def create_user_settings():
         errors.append("Adgangskoderne matcher ikke.")
     if not errors:
         try:
-            create_user(name, username, generate_password_hash(password), role=role)
-            flash(f"Bruger '{name}' er oprettet.", "success")
-            _hub_sync_user(username, role)
+            if _fjordhub_managed():
+                result = _hub_create_user({
+                    "username": username,
+                    "password": password,
+                    "role": role,
+                    "first_name": name,
+                    "last_name": "",
+                })
+                if not result.get("ok"):
+                    flash(str(result.get("error") or "Kunne ikke oprette bruger i FjordHub."), "error")
+                    return redirect(url_for("settings", section="users"))
+                flash(f"Bruger '{name}' er oprettet.", "success")
+            else:
+                create_user(name, username, generate_password_hash(password), role=role)
+                flash(f"Bruger '{name}' er oprettet.", "success")
+                _hub_sync_user(username, role, password=password, name=name)
         except Exception:
             flash("Brugernavnet er allerede i brug.", "error")
     else:
@@ -1345,22 +1355,27 @@ def create_user_settings():
 
 @app.post("/settings/users/<int:user_id>/delete")
 def delete_user_settings(user_id):
-    if _fjordhub_managed():
-        flash("Brugere håndteres igennem FjordHub.", "error")
-        return redirect(url_for("settings", section="users"))
-    if str(user_id) == str(session.get("user_id", "")):
-        flash("Du kan ikke slette din egen bruger.", "error")
-        return redirect(url_for("settings", section="users"))
     users = list_users()
+    if _fjordhub_managed():
+        users = _app_users()
     target = next((u for u in users if u["id"] == user_id), None)
     if not target:
         flash("Brugeren blev ikke fundet.", "error")
+        return redirect(url_for("settings", section="users"))
+    if str(target.get("username") or "").strip().lower() == str(session.get("user_id", "")).strip().lower():
+        flash("Du kan ikke slette din egen bruger.", "error")
         return redirect(url_for("settings", section="users"))
     admins = [u for u in users if u["role"] == "admin"]
     if target["role"] == "admin" and len(admins) <= 1:
         flash("Du kan ikke slette den eneste admin-bruger.", "error")
         return redirect(url_for("settings", section="users"))
-    delete_user(user_id)
+    if _fjordhub_managed():
+        result = _hub_delete_user_access(int(user_id))
+        if not result.get("ok"):
+            flash(str(result.get("error") or "Kunne ikke fjerne brugeradgang i FjordHub."), "error")
+            return redirect(url_for("settings", section="users"))
+    else:
+        delete_user(user_id)
     flash(f"Bruger '{target['name']}' er slettet.", "success")
     return redirect(url_for("settings", section="users"))
 
@@ -1446,10 +1461,15 @@ def _app_users() -> list[dict]:
     ]
 
 
-def _hub_sync_user(username: str, role: str) -> None:
+def _hub_sync_user(username: str, role: str, password: str = "", name: str = "") -> None:
     if not _fjordhub_managed():
         return
-    _hub_create_user({"username": username, "role": role})
+    payload: dict[str, str] = {"username": username, "role": role}
+    if password:
+        payload["password"] = password
+    if name:
+        payload["first_name"] = name
+    _hub_create_user(payload)
 
 
 @app.route("/api/hub/users", methods=["GET", "POST"])

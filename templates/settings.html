@@ -391,7 +391,7 @@
           </div>
         </div>
         {% if fjordhub_managed %}
-          <p class="managed-note">Håndteret igennem FjordHub. Du kan se brugerne her, men oprettelse og sletning styres i FjordHub.</p>
+          <p class="managed-note">Håndteret sammen med FjordHub (2-vejs). Brugere oprettet her synces til FjordHub, og brugere fra FjordHub vises her.</p>
         {% endif %}
         <table class="user-table">
           <thead>
@@ -413,29 +413,20 @@
                   </span>
                 </td>
                 <td class="user-actions">
-                  {% if fjordhub_managed %}
-                    <button class="danger-button small-button" type="button" disabled title="Håndteret igennem FjordHub">Slet</button>
-                  {% else %}
-                    <form method="post" action="{{ url_for('delete_user_settings', user_id=user.id) }}" accept-charset="UTF-8" onsubmit="return confirm('Slet {{ user.name }}?')">
-                      <button class="danger-button small-button" type="submit">Slet</button>
-                    </form>
-                  {% endif %}
+                  <form method="post" action="{{ url_for('delete_user_settings', user_id=user.id) }}" accept-charset="UTF-8" onsubmit="return confirm('Slet {{ user.name }}?')">
+                    <button class="danger-button small-button" type="submit">Slet</button>
+                  </form>
                 </td>
               </tr>
             {% endfor %}
           </tbody>
         </table>
         <div class="button-row" style="margin-top:18px">
-          {% if fjordhub_managed %}
-            <button type="button" class="button-link" disabled title="Håndteret igennem FjordHub">Opret bruger</button>
-          {% else %}
-            <button type="button" class="button-link" onclick="document.getElementById('create-user-modal').showModal()">Opret bruger</button>
-          {% endif %}
+          <button type="button" class="button-link" onclick="document.getElementById('create-user-modal').showModal()">Opret bruger</button>
         </div>
       </div>
     </section>
 
-    {% if not fjordhub_managed %}
       <dialog id="create-user-modal" class="user-modal">
         <div class="user-modal-inner">
           <div class="user-modal-head">
@@ -473,7 +464,6 @@
           </form>
         </div>
       </dialog>
-    {% endif %}
   </div>
 
   {# ── Update ───────────────────────────────────────────── #}
