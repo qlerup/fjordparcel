@@ -13,6 +13,7 @@ import random
 
 from dotenv import load_dotenv
 
+# Load environment variables early so runtime config is consistent in all start modes.
 load_dotenv()
 
 from flask import Flask, flash, jsonify, redirect, render_template, request, send_from_directory, session, url_for
