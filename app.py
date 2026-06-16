@@ -1434,17 +1434,24 @@ def _app_users() -> list[dict]:
     if not result.get("ok"):
         flash(str(result.get("error") or "Kunne ikke hente brugere fra FjordHub."), "error")
         return []
-    return [
-        {
-            "id": item.get("id"),
-            "name": item.get("username"),
-            "username": item.get("username"),
-            "role": item.get("role") or "user",
-            "created_at": item.get("created_at") or "",
-        }
-        for item in result.get("items", [])
-        if isinstance(item, dict)
-    ]
+    users: list[dict] = []
+    for item in result.get("items", []):
+        if not isinstance(item, dict):
+            continue
+        first_name = str(item.get("first_name") or "").strip()
+        last_name = str(item.get("last_name") or "").strip()
+        username = str(item.get("username") or "").strip()
+        display_name = (first_name + " " + last_name).strip() or username
+        users.append(
+            {
+                "id": item.get("id"),
+                "name": display_name,
+                "username": username,
+                "role": item.get("role") or "user",
+                "created_at": item.get("created_at") or "",
+            }
+        )
+    return users
 
 
 def _hub_sync_user(username: str, role: str) -> None:
