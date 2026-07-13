@@ -136,7 +136,7 @@ _AUTO_HEARTBEAT_INTERVAL_SECONDS = max(3, int(str(os.getenv("FJORDPARCEL_AUTOMAT
 _AUTO_NEXT_HEARTBEAT_AT = 0.0
 
 _AUTH_EXEMPT = frozenset({
-    "setup", "login", "logout", "hub_login",
+    "setup", "login", "login_change_password", "logout", "hub_login",
     "api_health",
     "favicon_ico", "favicon_32_png", "favicon_16_png",
     "apple_touch_icon", "site_webmanifest",
@@ -769,6 +769,11 @@ def login():
             password = request.form.get("password", "")
             user = _hub_authenticate(username, password)
             if user:
+                if user.get("must_change_password"):
+                    # Første login efter oprettelse: brugeren skal selv vælge en ny adgangskode
+                    return render_template(
+                        "auth.html", mode="change_password",
+                        fpc_username=username, fpc_current=password)
                 session["hub_user_id"] = int(user["id"])
                 session["user_id"] = str(user["username"]).strip().lower()
                 session["user_name"] = str(user.get("name") or user["username"])
@@ -795,6 +800,41 @@ def login():
             return redirect(url_for("index"))
         flash("Forkert brugernavn eller adgangskode.", "error")
     return render_template("auth.html", mode="login")
+
+
+@app.route("/login/change-password", methods=["POST"])
+def login_change_password():
+    """Tvungent kodeskift ved første login for FjordHub-styrede brugere."""
+    if not _fjordhub_managed():
+        return redirect(url_for("login"))
+    if "user_id" in session:
+        return redirect(url_for("index"))
+    username = request.form.get("username", "").strip()
+    current_password = request.form.get("current_password", "")
+    new_password = request.form.get("new_password", "")
+    new_password2 = request.form.get("new_password2", "")
+    if not username or not current_password:
+        return redirect(url_for("login"))
+
+    def _fpc_response(error_text: str):
+        flash(error_text, "error")
+        return render_template(
+            "auth.html", mode="change_password",
+            fpc_username=username, fpc_current=current_password)
+
+    if new_password != new_password2:
+        return _fpc_response("De nye adgangskoder matcher ikke.")
+    if len(new_password) < 6:
+        return _fpc_response("Adgangskoden skal være mindst 6 tegn.")
+    result = _hub_change_password(username, current_password, new_password)
+    user = result.get("user") if result.get("ok") and isinstance(result.get("user"), dict) else None
+    if not user:
+        return _fpc_response(str(result.get("error") or "Kunne ikke skifte adgangskoden."))
+    session["hub_user_id"] = int(user["id"])
+    session["user_id"] = str(user["username"]).strip().lower()
+    session["user_name"] = str(user.get("name") or user["username"])
+    session["role"] = "admin" if user.get("role") == "admin" else "user"
+    return redirect(url_for("index"))
 
 
 @app.post("/logout")
@@ -1432,6 +1472,13 @@ def _hub_authenticate(username: str, password: str) -> dict | None:
         {"username": username, "password": password},
     )
     return result.get("user") if result.get("ok") and isinstance(result.get("user"), dict) else None
+
+
+def _hub_change_password(username: str, current_password: str, new_password: str) -> dict:
+    return _hub_api(
+        "/api/hub/apps/change-password",
+        {"username": username, "current_password": current_password, "new_password": new_password},
+    )
 
 
 def _hub_create_user(payload: dict) -> dict:

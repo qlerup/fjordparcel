@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>{% if mode == 'setup' %}Opret admin bruger{% elif mode == 'setup_locked' %}Recovery kraeves{% else %}Log ind{% endif %} – FjordParcel</title>
+    <title>{% if mode == 'setup' %}Opret admin bruger{% elif mode == 'setup_locked' %}Recovery kraeves{% elif mode == 'change_password' %}Vælg ny adgangskode{% else %}Log ind{% endif %} – FjordParcel</title>
     <link rel="icon" href="{{ url_for('static', filename='logos/web/favicon.ico', v=app_build) }}" sizes="any">
     <link rel="stylesheet" href="{{ url_for('static', filename='styles.css', v=app_build) }}">
   </head>
@@ -55,6 +55,33 @@
             </div>
             <button type="submit" class="auth-submit">Opret bruger</button>
           </form>
+        {% elif mode == 'change_password' %}
+          <h1 class="auth-heading">Vælg ny adgangskode</h1>
+          <p class="auth-sub">Første login: Vælg din egen adgangskode for at fortsætte.</p>
+          <form method="post" action="{{ url_for('login_change_password') }}" class="auth-form" accept-charset="UTF-8">
+            <input type="hidden" name="username" value="{{ fpc_username }}">
+            <input type="hidden" name="current_password" value="{{ fpc_current }}">
+            <div class="auth-field">
+              <label for="newPassword">Ny adgangskode</label>
+              <input id="newPassword" name="new_password" type="password" autocomplete="new-password" minlength="6" required autofocus placeholder="Mindst 6 tegn">
+            </div>
+            <div class="auth-field">
+              <label for="newPassword2">Gentag ny adgangskode</label>
+              <input id="newPassword2" name="new_password2" type="password" autocomplete="new-password" minlength="6" required placeholder="Gentag adgangskoden">
+            </div>
+            <button type="submit" class="auth-submit">Gem og log ind</button>
+          </form>
+          <script>
+            (function(){
+              const np=document.getElementById('newPassword');
+              const np2=document.getElementById('newPassword2');
+              if(np && np2){
+                const sync=function(){ np2.setCustomValidity(np.value===np2.value?'':'De nye adgangskoder matcher ikke.'); };
+                np.addEventListener('input',sync);
+                np2.addEventListener('input',sync);
+              }
+            })();
+          </script>
         {% else %}
           <h1 class="auth-heading">Log ind</h1>
           <form method="post" action="{{ url_for('login') }}" class="auth-form" accept-charset="UTF-8">
