@@ -4,14 +4,14 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>{% if mode == 'setup' %}Opret admin bruger{% elif mode == 'setup_locked' %}Recovery kraeves{% elif mode == 'change_password' %}Vælg ny adgangskode{% else %}Log ind{% endif %} – FjordParcel</title>
-    <link rel="icon" href="{{ url_for('static', filename='logos/web/favicon.ico', v=app_build) }}" sizes="any">
+    <link rel="icon" href="{{ url_for('static', filename='logos/web/favicon.ico', v='brand-20261005') }}" sizes="any">
     <link rel="stylesheet" href="{{ url_for('static', filename='styles.css', v=app_build) }}">
   </head>
   <body class="auth-body">
     <div class="auth-wrap">
       <div class="auth-card">
         <a href="{{ url_for('index') }}" class="auth-brand" tabindex="-1">
-          <img src="{{ url_for('static', filename='logos/logos/fjordparcel-logo-horizontal-transparent.png', v=app_build) }}" alt="FjordParcel" class="auth-logo">
+          <img src="{{ url_for('static', filename='logos/logos/fjordparcel-logo-horizontal-transparent.png', v='brand-20261005') }}" alt="FjordParcel" class="auth-logo">
         </a>
 
         {% with messages = get_flashed_messages(with_categories=true) %}
