@@ -120,6 +120,35 @@ ensure_install_state_for_existing_users()
 SCAN_JOBS = {}
 SCAN_JOBS_LOCK = threading.Lock()
 SCAN_JOB_TTL_SECONDS = 60 * 60
+LOGIN_FAILURES = {}
+LOGIN_FAILURES_LOCK = threading.Lock()
+
+
+def _login_rate_key():
+    return request.remote_addr or "unknown"
+
+
+def _login_rate_limited():
+    key, now = _login_rate_key(), time.monotonic()
+    with LOGIN_FAILURES_LOCK:
+        recent = [stamp for stamp in LOGIN_FAILURES.get(key, []) if now - stamp < 300]
+        if recent:
+            LOGIN_FAILURES[key] = recent
+        else:
+            LOGIN_FAILURES.pop(key, None)
+        return len(recent) >= 5
+
+
+def _record_login_failure():
+    key, now = _login_rate_key(), time.monotonic()
+    with LOGIN_FAILURES_LOCK:
+        recent = [stamp for stamp in LOGIN_FAILURES.get(key, []) if now - stamp < 300]
+        LOGIN_FAILURES[key] = recent + [now]
+
+
+def _clear_login_failures():
+    with LOGIN_FAILURES_LOCK:
+        LOGIN_FAILURES.pop(_login_rate_key(), None)
 SETTINGS_SECTIONS = {"general", "mails", "carriers", "users", "update"}
 GLS_MERCHANT_LABEL_LOOKBACK_SECONDS = 7 * 24 * 60 * 60
 POSTNORD_PICKUP_LINK_TIMEOUT_SECONDS = float(os.getenv("POSTNORD_PICKUP_LINK_TIMEOUT_SECONDS", "8") or "8")
@@ -765,10 +794,14 @@ def login():
         if "user_id" in session:
             return redirect(url_for("index"))
         if request.method == "POST":
+            if _login_rate_limited():
+                flash("For mange mislykkede forsøg. Vent fem minutter.", "error")
+                return render_template("auth.html", mode="login"), 429
             username = request.form.get("username", "").strip()
             password = request.form.get("password", "")
             user = _hub_authenticate(username, password)
             if user:
+                _clear_login_failures()
                 if user.get("must_change_password"):
                     # Første login efter oprettelse: brugeren skal selv vælge en ny adgangskode
                     return render_template(
@@ -779,6 +812,7 @@ def login():
                 session["user_name"] = str(user.get("name") or user["username"])
                 session["role"] = "admin" if user.get("role") == "admin" else "user"
                 return redirect(url_for("index"))
+            _record_login_failure()
             flash("Forkert brugernavn/adgangskode eller ingen adgang til FjordParcel.", "error")
         return render_template("auth.html", mode="login")
     if not has_any_user():
@@ -790,14 +824,19 @@ def login():
     if "user_id" in session:
         return redirect(url_for("index"))
     if request.method == "POST":
+        if _login_rate_limited():
+            flash("For mange mislykkede forsøg. Vent fem minutter.", "error")
+            return render_template("auth.html", mode="login"), 429
         username = request.form.get("username", "").strip()
         password = request.form.get("password", "")
         user = get_user_by_username(username)
         if user and check_password_hash(user["password_hash"], password):
+            _clear_login_failures()
             session["user_id"] = user["username"]
             session["user_name"] = user["name"]
             session["role"] = user["role"]
             return redirect(url_for("index"))
+        _record_login_failure()
         flash("Forkert brugernavn eller adgangskode.", "error")
     return render_template("auth.html", mode="login")
 
