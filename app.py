@@ -1837,5 +1837,13 @@ _start_automation_on_boot()
 atexit.register(_release_automation_lock_on_exit)
 
 
+
+
+from hub_session_guard import install as install_hub_session_guard
+app.extensions['hub_session_call'] = lambda *args, **kwargs: _hub_api(*args, **kwargs)
+install_hub_session_guard(app, managed=lambda: bool(_FJORDHUB_URL and _FJORDHUB_API_KEY),
+    subject=lambda: ({'id': session.get('hub_user_id'), 'username': session.get('user_id')} if session.get('user_id') else None), revoke=lambda: None)
+_AUTH_EXEMPT = _AUTH_EXEMPT | {'api_hub_access'}
+
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=int(os.getenv("PORT", "5000")), debug=True)
