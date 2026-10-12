@@ -88,7 +88,7 @@
         {% else %}
           <h1 class="auth-heading">Log ind</h1>
           <form method="post" action="{{ url_for('login') }}" class="auth-form" accept-charset="UTF-8">
-{% if email_required %}<p>{{ error }}</p><div class="auth-field"><label for="first-login-email">Email til din FjordHub-konto</label><input id="first-login-email" name="first_login_email" type="email" autocomplete="email" required autofocus value="{{ request.form.get('first_login_email', '') }}"></div>{% endif %}
+{% if email_required %}<p>{{ error }}</p><div class="auth-field"><label for="first-login-email">Email til din FjordHub-konto</label><input id="first-login-email" name="first_login_email" type="email" autocomplete="email" required autofocus value="{{ request.form.get('first_login_email', '') }}"></div>{% endif %}{% if password_required %}<div class="auth-field"><label for="first-login-password">Ny personlig adgangskode</label><input id="first-login-password" name="first_login_password" type="password" autocomplete="new-password" minlength="6" maxlength="128" required></div><div class="auth-field"><label for="first-login-password-confirm">Gentag ny adgangskode</label><input id="first-login-password-confirm" name="first_login_password_confirm" type="password" autocomplete="new-password" minlength="6" maxlength="128" required></div>{% endif %}
 
             <div class="auth-field">
               <label for="username">Brugernavn</label>
