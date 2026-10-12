@@ -38,6 +38,8 @@
           <h1 class="auth-heading">Opret admin bruger</h1>
           <p class="auth-sub">Opret den første bruger for at komme i gang.</p>
           <form method="post" action="{{ url_for('setup') }}" class="auth-form" autocomplete="off" accept-charset="UTF-8">
+
+
             <div class="auth-field">
               <label for="name">Navn</label>
               <input id="name" name="name" type="text" autocomplete="name" required value="{{ form_name or '' }}" placeholder="Dit fulde navn">
@@ -86,6 +88,8 @@
         {% else %}
           <h1 class="auth-heading">Log ind</h1>
           <form method="post" action="{{ url_for('login') }}" class="auth-form" accept-charset="UTF-8">
+{% if email_required %}<p>{{ error }}</p><div class="auth-field"><label for="first-login-email">Email til din FjordHub-konto</label><input id="first-login-email" name="first_login_email" type="email" autocomplete="email" required autofocus value="{{ request.form.get('first_login_email', '') }}"></div>{% endif %}
+
             <div class="auth-field">
               <label for="username">Brugernavn</label>
               <input id="username" name="username" type="text" autocomplete="username" required placeholder="Dit brugernavn">

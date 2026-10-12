@@ -802,6 +802,8 @@ def login():
             user = _hub_authenticate(username, password)
             if user:
                 _clear_login_failures()
+                if user.get("email_required"):
+                    return render_template("auth.html", email_required=True, error=user.get("email_error") or "Indtast din email ved første login og bekræft dit login.", mode="login")
                 if user.get("must_change_password"):
                     # Første login efter oprettelse: brugeren skal selv vælge en ny adgangskode
                     return render_template(
@@ -1508,7 +1510,7 @@ def _hub_api(path: str, payload: dict | None = None, method: str = "POST") -> di
 def _hub_authenticate(username: str, password: str) -> dict | None:
     result = _hub_api(
         "/api/hub/apps/authenticate",
-        {"username": username, "password": password},
+        {"username": username, "password": password, "first_login_email": request.form.get("first_login_email", "")},
     )
     return result.get("user") if result.get("ok") and isinstance(result.get("user"), dict) else None
 
