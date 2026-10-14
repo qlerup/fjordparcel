@@ -1,108 +1,88 @@
 # FjordParcel
 
-Self-hosted pakke-tracker der automatisk scanner dine mails og samler tracking-information fra DAO, PostNord, GLS og Bring på ét sted.
+A self-hosted parcel tracker that scans connected mailboxes and collects tracking updates in one dashboard. The interface currently uses Danish labels.
 
-## Funktioner
+## Features
 
-- **Automatisk mailscanning** — kobler til Hotmail/Outlook eller Gmail via OAuth og finder pakker i dine mails
-- **Live tracking** — henter status direkte fra fragtfirmaernes egne API'er
-- **Understøttede fragtfirmaer** — DAO, PostNord, GLS, Bring
-- **Automatisk baggrundsopdatering** — valgfrit interval til scanning og tracking-refresh
-- **Brugeradministration** — opret admin- og brugerkonti med hashede adgangskoder
-- **Rollebaseret adgang** — admins har fuld adgang; brugere ser kun pakker
-- **Kører i Docker** — enkelt setup med docker compose
+- Microsoft/Hotmail/Outlook OAuth with IMAP, and Gmail OAuth with the Gmail API.
+- Multiple connected mail accounts, individual scan settings, background scanning and scan progress.
+- Parcel extraction for DAO, PostNord, GLS and Bring. The mail parser also recognizes FedEx references and tracking links.
+- Manual parcel entry, labels, refresh, archive/restore and hide/unhide controls.
+- Optional background mail scanning and tracking refresh; tracking updates run every 30 minutes when enabled.
+- Carrier-specific postal-code settings and configurable 17TRACK integration for PostNord tracking.
+- Administrator and regular-user roles, hashed passwords and temporary login lockout.
+- FjordHub shared accounts, SSO, first-login onboarding and active-session access checks.
+- Administrator-only update checks, update progress and scheduled update checking.
 
-## Kom i gang
+## Install through FjordHub
 
-### Krav
+Select **FjordParcel** in the catalog, choose storage and a free port (default **8096**), then install. Open the app from FjordHub for single-use SSO, or sign in directly with the same account. Managed installations skip local account setup and preserve the user's first/last-name display name. Administrators manage connections, configuration and users; regular users have the parcel view.
 
-- [Docker](https://www.docker.com/products/docker-desktop/) og Docker Compose
+First-login email confirmation and replacement of a temporary password can be completed inside the app. Current Hub membership is checked during existing sessions; removed access invalidates the session and Hub outages block protected requests.
 
-### Installation
+An administrator can require an email update in FjordHub. Opening or returning to the app presents a mandatory form, even for existing logins. Saving a valid, unique address clears the shared requirement across connected apps. Update both Hub and Parcel for this flow.
 
-```bash
-git clone https://github.com/<dit-brugernavn>/fjordparcel.git
+## Standalone installation
+
+```sh
+git clone https://github.com/qlerup/fjordparcel.git
 cd fjordparcel
+cp .env.example .env
+# Set a long random SECRET_KEY and your storage/public URL settings.
+docker compose up -d --build
 ```
 
-Opret en `.env`-fil:
+Open `http://localhost:8096` and create the first administrator. Use HTTPS for public access.
 
-```env
-SECRET_KEY=skift-denne-til-noget-tilfaeldigt-og-hemmeligt
-PUBLIC_BASE_URL=http://localhost:8096
-```
+## Configuration
 
-Start appen:
+| Variable | Purpose |
+| --- | --- |
+| `SECRET_KEY` | Flask session key; use a long random value and preserve it. |
+| `PUBLIC_BASE_URL` | Optional public URL fallback. Change the saved address under Settings → Mail. |
+| `DATA_DIR` | Host data directory. Fresh setup records an absolute path so the updater reuses the same mount. |
+| `APP_ENCRYPTION_KEY` | Optional Fernet token-encryption key; generated and stored locally if omitted. Preserve it. |
 
-```bash
-docker compose up -d
-```
+Database, configuration and encrypted tokens persist in the mounted data directory, normally `./data/`. The container reads its internal data mount, not the host path. Configure the public address after installation so OAuth callback origins match.
 
-Åbn `http://localhost:8096` og opret den første admin-bruger.
+## Mail connections
 
-### Opdatering
+### Microsoft / Hotmail / Outlook
 
-```bash
-docker compose up --build -d
-```
-
-## Konfiguration
-
-| Variabel          | Beskrivelse                                                        |
-|-------------------|--------------------------------------------------------------------|
-| `SECRET_KEY`      | Flask session-nøgle — brug en lang, tilfældig streng i produktion |
-| `PUBLIC_BASE_URL` | Valgfri fallback for appens offentlige URL. Kan ændres i databasen fra **Indstillinger → Mails**. |
-| `DATA_DIR`        | Host-sti til data-mappen. Fresh setup sætter den absolut, så in-app updateren genstarter med samme database-mount. |
-| `APP_ENCRYPTION_KEY` | Valgfri [Fernet](https://cryptography.io/en/latest/fernet/)-nøgle til kryptering af tokens. Genereres automatisk og gemmes lokalt hvis den ikke sættes. |
-
-Data (database, tokens) gemmes som standard i `./data/` og bevares på tværs af genstart.
-
-## Mailopsætning
-
-### Microsoft (Hotmail / Outlook)
-
-1. Opret en app-registrering i [Azure-portalen](https://portal.azure.com/#view/Microsoft_AAD_RegisteredApps)
-2. Tilføj redirect-URI: `<PUBLIC_BASE_URL>/auth/microsoft/callback`
-3. Giv delegeret tilladelse: `IMAP.AccessAsUser.All` (fra Office 365 Exchange Online)
-4. Gem klient-ID og klienthemmelighed under **Indstillinger → Mails → Konfigurér Hotmail**
+1. Create an app registration in the [Azure portal](https://portal.azure.com/#view/Microsoft_AAD_RegisteredApps).
+2. Register `<PUBLIC_BASE_URL>/auth/microsoft/callback`.
+3. Grant delegated `IMAP.AccessAsUser.All` from Office 365 Exchange Online.
+4. Save the client ID and client secret under Settings → Mail → Configure Hotmail, then connect the account.
 
 ### Gmail
 
-1. Opret et OAuth 2.0-klient-ID i [Google Cloud Console](https://console.cloud.google.com/)
-2. Aktiver Gmail API og tilføj scope: `https://www.googleapis.com/auth/gmail.readonly`
-3. Tilføj redirect-URI: `<PUBLIC_BASE_URL>/auth/google/callback`
-4. Gem klient-ID og klienthemmelighed under **Indstillinger → Mails → Konfigurér Gmail**
+1. Create an OAuth 2.0 client in [Google Cloud Console](https://console.cloud.google.com/).
+2. Enable the Gmail API and configure `https://www.googleapis.com/auth/gmail.readonly`.
+3. Register `<PUBLIC_BASE_URL>/auth/google/callback`.
+4. Save the client ID and client secret under Settings → Mail → Configure Gmail, then connect the account.
 
-> Gmail read-scopes er klassificeret som "restricted" af Google. Til privat brug: hold OAuth-appen i testtilstand og tilføj din Gmail-adresse som testbruger.
+Gmail read scopes are restricted. For private testing, keep the OAuth app in testing and add the intended Gmail address as a test user. Provider consent, callback configuration and carrier API availability remain prerequisites. Save the PostNord 17TRACK key in carrier settings; extraction from email and live tracking are separate operations.
 
-## Projektstruktur
+## Updates and backup
 
-```
-fjordparcel/
-├── app.py              # Flask-routes og request-logik
-├── tracking.py         # Parsing og tracking-opslag pr. fragtfirma
-├── storage.py          # SQLite-adgang (pakker, brugere, konfiguration)
-├── mail_services.py    # Fælles mailscanning-logik
-├── imap_mail.py        # Microsoft OAuth + IMAP
-├── gmail_mail.py       # Google OAuth + Gmail API
-├── app_config.py       # Indstillinger og kryptering
-├── templates/          # Jinja2 HTML-templates
-├── static/             # CSS, JS, logoer
-├── tests/              # pytest-tests
-├── Dockerfile
-└── docker-compose.yml
+Update managed deployments through FjordHub. Standalone deployments can use the update UI or rebuild:
+
+```sh
+git pull --ff-only
+docker compose up -d --build
 ```
 
-## Tests
+Back up the complete data directory, `.env` and original encryption/session keys. Stop before a file-based SQLite copy. Rebuilds preserve mounted data. Restore compatible code and data together; do not replace keys during an ordinary update.
 
-```bash
-pytest
+## Development
+
+```sh
+python -m pip install -r requirements.txt
+python -m pytest tests -q
 ```
 
-## Teknologier
+Flask, SQLite and Gunicorn provide the backend. `app.py` implements routes; `tracking.py` parses carrier references; `storage.py` stores parcels/users/settings; `mail_services.py`, `imap_mail.py` and `gmail_mail.py` implement mail access; `app_config.py` handles settings and encryption. UI and regression tests are in `templates/`, `static/` and `tests/`.
 
-[Flask](https://flask.palletsprojects.com/) · [SQLite](https://www.sqlite.org/) · [Gunicorn](https://gunicorn.org/) · [Docker](https://www.docker.com/)
+## License
 
-## Licens
-
-MIT
+MIT.
