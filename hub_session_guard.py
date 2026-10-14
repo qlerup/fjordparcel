@@ -2,6 +2,7 @@
 import threading
 import time
 from flask import jsonify, redirect, request, session
+from hub_email import required_response, submit_email
 
 
 class HubAccessUnavailable(Exception):
@@ -55,12 +56,32 @@ def install(app, *, managed, subject, revoke):
         identity = subject()
         if identity is None:
             return None
+        if endpoint == 'api_hub_access' and request.args.get('fresh') == '1':
+            snapshot.expires = 0
         try:
             member = snapshot.member(identity)
         except HubAccessUnavailable:
             return jsonify(ok=False, error_code='hub_unavailable', error='FjordHub kunne ikke kontaktes. Prøv igen om lidt.'), 503
         if member is None:
             return denied()
+        if member.get('email_required') and endpoint != 'api_hub_email':
+            return required_response()
+
+    @app.post('/api/auth/email')
+    def api_hub_email():
+        identity = subject()
+        if not managed() or identity is None:
+            return jsonify(ok=False, error='Log ind med din FjordHub-konto.'), 401
+        snapshot.expires = 0
+        try:
+            member = snapshot.member(identity)
+        except HubAccessUnavailable:
+            return jsonify(ok=False, error='FjordHub kunne ikke kontaktes. Prøv igen om lidt.'), 503
+        if member is None:
+            return denied()
+        result = submit_email(member, app.extensions['hub_session_call'])
+        snapshot.expires = 0
+        return result
 
     @app.get('/api/auth/access')
     def api_hub_access():
