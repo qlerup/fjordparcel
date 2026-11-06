@@ -64,3 +64,23 @@ def test_registration_fetches_ready_events_immediately(monkeypatch):
 def test_empty_accepted_tracking_is_pending():
     result=track17._parse_response({'data':{'accepted':[{'number':'ABC12345','track_info':None}]}},'ABC12345')
     assert result.status=='Afventer 17TRACK' and not result.error
+
+
+@pytest.mark.parametrize('latest_only',[False,True])
+def test_danish_translation_used_in_summary_and_events(latest_only):
+    data=response()
+    info=data['data']['accepted'][0]['track_info']
+    event=info['tracking']['providers'][0]['events'][0]
+    event['description_translation']={'lang':'da','description':'Pakken er under transport'}
+    if latest_only:
+        info['latest_event']=event
+        info['tracking']['providers']=[]
+    result=track17._parse_response(data,'ABC12345')
+    assert result.status==result.last_event_text=='Pakken er under transport'
+    assert result.events[0]['description']=='Pakken er under transport'
+
+
+@pytest.mark.parametrize('translation',[None,{}, {'lang':'da','description':''}, {'lang':'de','description':'Unterwegs'}])
+def test_missing_danish_translation_preserves_original(translation):
+    event=track17._parse_event({'description':'Original event','description_translation':translation})
+    assert event['description']=='Original event'

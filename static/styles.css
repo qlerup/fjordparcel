@@ -1395,6 +1395,18 @@ code[hidden] {
     grid-column: 1 / 2;
   }
 
+  .shipment-row > div.last-event-cell {
+    grid-column: 1 / -1;
+  }
+
+  .last-event-cell strong {
+    display: block;
+    overflow: visible;
+    text-overflow: clip;
+    -webkit-line-clamp: unset;
+    line-clamp: unset;
+  }
+
   .row-actions {
     grid-column: 2 / 3;
     grid-row: 1 / 2;

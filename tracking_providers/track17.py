@@ -68,7 +68,9 @@ def _to_danish_text(text: str) -> str:
 def _parse_event(event: dict[str, Any]) -> dict[str, Any]:
     date_iso, display_date, display_time = _parse_datetime(event.get("time_iso") or "")
     location = _text(event.get("location") or "").replace("Denmark", "Danmark")
-    description = _to_danish_text(_text(event.get("description") or ""))
+    translation = event.get("description_translation")
+    translated = translation.get("description") if isinstance(translation, dict) and translation.get("lang") == "da" else ""
+    description = _text(translated) or _to_danish_text(_text(event.get("description") or ""))
     return {
         "description": description,
         "status": _text(event.get("sub_status") or event.get("stage") or ""),
