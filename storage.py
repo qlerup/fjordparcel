@@ -1186,6 +1186,15 @@ def refresh_shipment_tracking(shipment_id):
     except Exception as error:
         result = _tracking_error_result(shipment, error)
 
+    if not result.error and result.source == "17track-api" and result.carrier not in ("", "Unknown", "Ukendt"):
+        with get_connection() as db:
+            db.execute("UPDATE shipments SET carrier = ? WHERE id = ?", (normalize_text(result.carrier, max_length=120), int(shipment_id)))
+    if result.error:
+        with get_connection() as db:
+            db.execute("UPDATE shipments SET tracking_error = ?, last_checked_at = ? WHERE id = ?",
+                       (normalize_text(result.error, max_length=260), utc_now(), int(shipment_id)))
+        return get_shipment(shipment_id)
+
     resolved_number = number
     try:
         provider_number = normalize_tracking_number(result.tracking_number or number)

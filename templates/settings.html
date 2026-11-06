@@ -337,7 +337,6 @@
         </nav>
       </aside>
 
-      {% if active_carrier == 'PostNord' %}
       <div class="panel">
         <div class="panel-heading">
           <h2>17TRACK API-nøgle</h2>
@@ -350,11 +349,11 @@
         </div>
         {% if track17_api_key_set %}
         <p class="setting-line">
-          API-nøglen er konfigureret og krypteret. PostNord-tracking er aktiv via 17TRACK API. Du kan opdatere nøglen nedenfor hvis nødvendigt.
+          API-nøglen er konfigureret og krypteret. Alle trackingopslag bruger 17TRACK API. Du kan opdatere nøglen nedenfor hvis nødvendigt.
         </p>
         {% else %}
         <p class="setting-line">
-          PostNord-tracking kræver en 17TRACK API-nøgle. Opret en gratis konto på <a href="https://www.17track.net/en/api" target="_blank" rel="noreferrer">17track.net/en/api</a>, find din nøgle under Settings og indsæt den herunder.
+          Tracking for alle fragtfirmaer kræver en 17TRACK API-nøgle. Opret en konto på <a href="https://www.17track.net/en/api" target="_blank" rel="noreferrer">17track.net/en/api</a>, find din nøgle under Settings og indsæt den herunder.
         </p>
         {% endif %}
         <form class="settings-form" method="post" action="{{ url_for('save_track17_api_key') }}" accept-charset="UTF-8">
@@ -365,14 +364,7 @@
           <button type="submit">Gem API-nøgle</button>
         </form>
       </div>
-      {% else %}
-      <div class="panel">
-        <div class="panel-heading">
-          <h2>{{ active_carrier }}</h2>
-        </div>
-        <p class="setting-line muted-text">Ingen indstillinger tilgængelige for {{ active_carrier }}.</p>
-      </div>
-      {% endif %}
+
 
     </section>
   </div>

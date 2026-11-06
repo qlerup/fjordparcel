@@ -9,7 +9,7 @@ A self-hosted parcel tracker that scans connected mailboxes and collects trackin
 - Parcel extraction for DAO, PostNord, GLS and Bring. The mail parser also recognizes FedEx references and tracking links.
 - Manual parcel entry, labels, refresh, archive/restore and hide/unhide controls.
 - Optional background mail scanning and tracking refresh; tracking updates run every 30 minutes when enabled.
-- Carrier-specific postal-code settings and configurable 17TRACK integration for PostNord tracking.
+- All parcel status updates use the official 17TRACK API and the existing encrypted API key. Carrier websites are not used for tracking lookups.
 - Administrator and regular-user roles, hashed passwords and temporary login lockout.
 - FjordHub shared accounts, SSO, first-login onboarding and active-session access checks.
 - Administrator-only update checks, update progress and scheduled update checking.
@@ -61,7 +61,7 @@ Database, configuration and encrypted tokens persist in the mounted data directo
 3. Register `<PUBLIC_BASE_URL>/auth/google/callback`.
 4. Save the client ID and client secret under Settings → Mail → Configure Gmail, then connect the account.
 
-Gmail read scopes are restricted. For private testing, keep the OAuth app in testing and add the intended Gmail address as a test user. Provider consent, callback configuration and carrier API availability remain prerequisites. Save the PostNord 17TRACK key in carrier settings; extraction from email and live tracking are separate operations.
+Gmail read scopes are restricted. For private testing, keep the OAuth app in testing and add the intended Gmail address as a test user. Provider consent, callback configuration and carrier API availability remain prerequisites. Save the shared 17TRACK key in carrier settings; extraction from email and live tracking are separate operations.
 
 ## Updates and backup
 
@@ -86,3 +86,9 @@ Flask, SQLite and Gunicorn provide the backend. `app.py` implements routes; `tra
 ## License
 
 MIT.
+
+### Manual tracking and 17TRACK
+
+Use **Tilføj trackingnummer** at the top of the parcel overview; an optional label helps identify the parcel. Duplicate numbers refresh the existing entry. The shared integration first requests existing tracking information and registers previously unknown numbers for automatic carrier detection. New registrations may need a later refresh before events are available. API failures retain the last known shipment details and display an error.
+
+The API key under **Indstillinger → Fragtfirmaer** applies to every carrier. Existing encrypted keys are reused. Registration is subject to your 17TRACK account quota; FjordParcel does not fall back to scraping carrier websites. See the [17TRACK v2.2 API documentation](https://asset.17track.net/api/document/v2.2_en/index.html).

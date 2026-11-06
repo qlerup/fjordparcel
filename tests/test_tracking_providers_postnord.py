@@ -1,67 +1,52 @@
-from tracking_providers import postnord
+import pytest
+from tracking_providers import track17, fetch_tracking
 
 
-def test_build_request_payload_uses_number_and_sign():
-    payload = postnord._build_request_payload("00073215400595127740", "abc-sign")
-
-    assert payload["data"][0]["num"] == "00073215400595127740"
-    assert payload["data"][0]["fc"] == 0
-    assert payload["data"][0]["sc"] == 0
-    assert payload["sign"] == "abc-sign"
+def response(number='ABC12345'):
+    return {'code':0,'data':{'accepted':[{'number':number,'track_info':{
+        'latest_status':{'status':'InTransit'},
+        'tracking':{'providers':[{'provider':{'name':'GLS'},'events':[{
+            'time_iso':'2026-11-06T10:00:00Z','description':'In transit','location':'Denmark'}]}]}}}]}}
 
 
-def test_parse_tracking_response_maps_events_and_danish_text():
-    payload = {
-        "meta": {"code": 200, "message": "Ok"},
-        "shipments": [
-            {
-                "code": 200,
-                "number": "00073215400568030824",
-                "shipment": {
-                    "latest_status": {"status": "AvailableForPickup"},
-                    "misc_info": {"service_type": "PostNord Service Point"},
-                    "tracking": {
-                        "providers": [
-                            {
-                                "provider": {"name": "PostNord Sweden"},
-                                "events": [
-                                    {
-                                        "time_iso": "2026-06-08T11:56:40+02:00",
-                                        "description": "E-mail notification has been sent to the recipient",
-                                        "location": "Denmark",
-                                        "sub_status": "AvailableForPickup_Other",
-                                    },
-                                    {
-                                        "time_iso": "2026-06-06T09:22:10+02:00",
-                                        "description": "The shipment item is under transportation",
-                                        "location": "Denmark",
-                                        "sub_status": "InTransit_Departure",
-                                    },
-                                ],
-                            }
-                        ]
-                    },
-                },
-            }
-        ],
-    }
-
-    result = postnord._parse_tracking_response(payload, "00073215400568030824")
-
-    assert result.carrier == "PostNord"
-    assert result.source == "17track-restapi"
-    assert result.summary == "PostNord Service Point"
-    assert result.status == "e-mail-meddelelse er sendt til modtageren"
-    assert result.status_code == "AvailableForPickup"
-    assert result.last_event_location == "Danmark"
-    assert result.last_event_at == "2026-06-08T11:56:40+02:00"
-    assert len(result.events) == 2
-    assert result.events[0]["description"] == "e-mail-meddelelse er sendt til modtageren"
-    assert result.events[1]["description"] == "forsendelsesvaren er under transport"
+@pytest.mark.parametrize('carrier',['GLS','DAO','Bring','PostNord','FedEx','Unknown'])
+def test_all_carriers_use_same_api(monkeypatch,carrier):
+    calls=[]
+    monkeypatch.setattr(track17,'_get_api_key',lambda:'secret-test-key')
+    def request(endpoint,payload,key,timeout):
+        calls.append((endpoint,payload));return response()
+    monkeypatch.setattr(track17,'_api_request',request)
+    result=fetch_tracking('ABC12345',carrier=carrier)
+    assert result.source=='17track-api' and result.carrier=='GLS'
+    assert result.status_code=='InTransit' and len(result.events)==1
+    assert calls==[('gettrackinfo',[{'number':'ABC12345'}])]
 
 
-def test_parse_tracking_response_handles_sign_error():
-    result = postnord._parse_tracking_response({"meta": {"code": -10, "message": ""}, "shipments": []}, "00073215400568030824")
+def test_register_only_unregistered_number(monkeypatch):
+    monkeypatch.setattr(track17,'_get_api_key',lambda:'test')
+    calls=[]
+    def request(endpoint,payload,*args):
+        calls.append(endpoint)
+        if endpoint=='gettrackinfo':return {'data':{'rejected':[{'number':'ABC12345','error':{'code':-18019902}}]}}
+        return {'code':0,'data':{'accepted':[{'number':'ABC12345'}]}}
+    monkeypatch.setattr(track17,'_api_request',request)
+    result=fetch_tracking('ABC12345')
+    assert calls==['gettrackinfo','register']
+    assert result.status=='Afventer 17TRACK' and not result.error
 
-    assert result.status == "Ikke fundet"
-    assert "Forny sign" in result.error or "fornyelse" in result.error
+
+@pytest.mark.parametrize('code',[-18019908,-18010002,-18019903])
+def test_api_errors_are_reported(monkeypatch,code):
+    monkeypatch.setattr(track17,'_get_api_key',lambda:'test')
+    monkeypatch.setattr(track17,'_api_request',lambda *a:{'data':{'rejected':[{'number':'ABC12345','error':{'code':code}}]}})
+    assert str(code) in fetch_tracking('ABC12345').error
+
+
+def test_missing_key_does_not_call_any_provider(monkeypatch):
+    monkeypatch.setattr(track17,'_get_api_key',lambda:'')
+    monkeypatch.setattr(track17,'_api_request',lambda *a:pytest.fail('Unexpected request'))
+    assert 'API-nøgle mangler' in fetch_tracking('ABC12345').error
+
+
+def test_response_never_uses_another_parcel():
+    assert track17._parse_response(response('OTHER123'),'ABC12345').error

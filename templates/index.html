@@ -126,6 +126,16 @@
     </div>
   </section>
 
+  <section class="panel" aria-labelledby="manual-tracking-title">
+    <h2 id="manual-tracking-title">Tilføj trackingnummer</h2>
+    <p>Følg en pakke via 17TRACK. Fragtfirmaet findes automatisk.</p>
+    <form class="settings-form" method="post" action="{{ url_for('create_shipment') }}">
+      <label><span>Trackingnummer</span><input name="tracking_number" required maxlength="60" autocomplete="off" autocapitalize="characters" placeholder="Indsæt trackingnummer"></label>
+      <label><span>Pakkenavn (valgfrit)</span><input name="label" maxlength="120" placeholder="Fx sko fra webshop"></label>
+      <button type="submit">Tilføj pakke</button>
+    </form>
+  </section>
+
   <section class="stat-grid" aria-label="Tracking overview">
     <div class="stat">
       <span>Pakker på vej</span>

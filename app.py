@@ -1011,15 +1011,22 @@ def create_shipment():
     label = request.form.get("label", "").strip() or None
 
     try:
-        created, shipment = add_shipment(tracking_number, label=label, source="manual")
+        import re
+        number = re.sub(r"[\s-]+", "", tracking_number).upper()
+        if not re.fullmatch(r"[A-Z0-9]{5,50}", number):
+            raise ValueError("Indtast et trackingnummer på 5–50 bogstaver eller tal.")
+        created, shipment = add_shipment(number, label=label, source="manual")
+        shipment = refresh_shipment_tracking(shipment["id"])
     except ValueError as error:
         flash(str(error), "error")
         return redirect(url_for("index"))
 
     if created:
-        flash(f"Added {shipment['tracking_number']}.", "success")
+        flash(f"Tilføjet {shipment['tracking_number']}.", "success")
     else:
-        flash(f"{shipment['tracking_number']} was already saved, so I refreshed it.", "info")
+        flash("Trackingnummeret findes allerede og er blevet opdateret.", "info")
+    if shipment.get("tracking_error"):
+        flash(shipment["tracking_error"], "error")
     return redirect(url_for("index"))
 
 
@@ -1241,7 +1248,7 @@ def remove_carrier_postal_code_entry(carrier):
 
 @app.post("/settings/postnord/apikey")
 def save_track17_api_key():
-    import tracking_providers.postnord as _postnord
+    import tracking_providers.track17 as _postnord
     from app_config import save_track17_api_key as _save_key
     api_key = str(request.form.get("api_key") or "").strip()
     if not api_key:
@@ -1339,7 +1346,7 @@ def settings():
             "auto_scan_minutes": 30,
         }
 
-    import tracking_providers.postnord as _postnord
+    import tracking_providers.track17 as _postnord
     from app_config import load_track17_settings as _load_track17
     return render_template(
         "settings.html",
