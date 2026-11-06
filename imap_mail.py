@@ -195,6 +195,14 @@ def _xoauth2_authenticator(username, access_token):
     return lambda _challenge: auth_string.encode("utf-8")
 
 
+def _decode_mail_bytes(payload, encoding):
+    try:
+        return payload.decode(encoding or "utf-8", errors="replace")
+    except LookupError:
+        # Some senders declare unknown-8bit or an invalid MIME charset.
+        return payload.decode("utf-8", errors="replace")
+
+
 def _decode_header_value(value):
     if not value:
         return ""
@@ -202,7 +210,7 @@ def _decode_header_value(value):
     decoded_parts = []
     for part, encoding in decode_header(value):
         if isinstance(part, bytes):
-            decoded_parts.append(part.decode(encoding or "utf-8", errors="replace"))
+            decoded_parts.append(_decode_mail_bytes(part, encoding))
         else:
             decoded_parts.append(part)
     return "".join(decoded_parts)
@@ -224,12 +232,12 @@ def _message_text(message):
             payload = part.get_payload(decode=True)
             if payload:
                 charset = part.get_content_charset() or "utf-8"
-                chunks.append(payload.decode(charset, errors="replace"))
+                chunks.append(_decode_mail_bytes(payload, charset))
     else:
         payload = message.get_payload(decode=True)
         if payload:
             charset = message.get_content_charset() or "utf-8"
-            chunks.append(payload.decode(charset, errors="replace"))
+            chunks.append(_decode_mail_bytes(payload, charset))
     return "\n".join(chunks)
 
 

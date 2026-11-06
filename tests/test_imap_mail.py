@@ -82,3 +82,19 @@ def test_plaintext_token_cache_is_migrated_to_encrypted(tmp_path, monkeypatch):
     assert json.loads(cache.serialize()) == json.loads(payload)
     assert "access-token" not in stored
     assert "refresh-token" not in stored
+
+
+@pytest.mark.parametrize("charset", ["unknown-8bit", "not-a-real-charset"])
+@pytest.mark.parametrize("multipart", [False, True])
+def test_unknown_mail_charset_does_not_abort_scan(charset, multipart):
+    raw = (
+        "From: Shop <shop@example.com>\r\n"
+        f"Subject: =?{charset}?Q?Package_1234567890123?=\r\n"
+        + ("Content-Type: multipart/alternative; boundary=part\r\n\r\n--part\r\n" if multipart else "")
+        + f"Content-Type: text/plain; charset={charset}\r\n\r\n"
+        + "PostNord tracking number: 1234567890123\r\n"
+        + ("--part--\r\n" if multipart else "")
+    ).encode("ascii")
+    message = _parse_message(raw)
+    assert "1234567890123" in message["subject"]
+    assert "1234567890123" in message["bodyPreview"]
