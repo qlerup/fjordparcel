@@ -1709,6 +1709,17 @@ def _pending_tracking_worker():
         time.sleep(5)
 
 
+def _parcel_notification_worker():
+    from parcel_notifications import deliver_one
+    while True:
+        try:
+            if _fjordhub_managed():
+                deliver_one(_hub_api)
+        except Exception:
+            app.logger.exception("Parcel notification delivery failed")
+        time.sleep(5)
+
+
 def _ensure_automation_thread():
     global _AUTO_THREAD_STARTED
     if _AUTO_THREAD_STARTED:
@@ -1716,6 +1727,7 @@ def _ensure_automation_thread():
     th = threading.Thread(target=_automation_worker, name="automation-worker", daemon=True)
     th.start()
     threading.Thread(target=_pending_tracking_worker, name="initial-tracking-worker", daemon=True).start()
+    threading.Thread(target=_parcel_notification_worker, name="parcel-notifications", daemon=True).start()
     _AUTO_THREAD_STARTED = True
 
 

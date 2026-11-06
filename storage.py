@@ -112,6 +112,8 @@ def get_connection():
 
 def init_db():
     with get_connection() as db:
+        from parcel_notifications import init
+        init(db)
         db.execute(
             """
             CREATE TABLE IF NOT EXISTS shipments (
@@ -971,6 +973,9 @@ def add_shipment(
             )
 
         shipment = db.execute("SELECT * FROM shipments WHERE id = ?", (shipment_id,)).fetchone()
+        if created:
+            from parcel_notifications import enqueue
+            enqueue(db, shipment, 'tracking_added')
     return created, row_to_dict(shipment)
 
 
@@ -1274,6 +1279,9 @@ def refresh_shipment_tracking(shipment_id):
             ),
         )
         updated = db.execute("SELECT * FROM shipments WHERE id = ?", (int(shipment_id),)).fetchone()
+        if result.source == '17track-api' and not result.error:
+            from parcel_notifications import new_events
+            new_events(db, shipment, updated, result.events or [])
 
     archive_due_delivered_shipments(now)
     return get_shipment(shipment_id) or row_to_dict(updated)
