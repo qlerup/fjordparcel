@@ -89,6 +89,6 @@ MIT.
 
 ### Manual tracking and 17TRACK
 
-Use **Tilføj trackingnummer** at the top of the parcel overview; an optional label helps identify the parcel. Duplicate numbers refresh the existing entry. The shared integration first requests existing tracking information and registers previously unknown numbers for automatic carrier detection. New registrations may need a later refresh before events are available. API failures retain the last known shipment details and display an error.
+Use **Tilføj trackingnummer** at the top of the parcel overview; an optional label helps identify the parcel. Duplicate numbers refresh the existing entry. The shared integration first requests existing tracking information and registers previously unknown numbers for automatic carrier detection. New registrations are queried immediately. If 17TRACK is still collecting events, a durable background worker retries once a minute, independently of the normal auto-refresh setting. An open overview updates automatically when the result is ready; editing a form prevents an automatic reload. API failures retain the last known shipment details and display an error.
 
 The API key under **Indstillinger → Fragtfirmaer** applies to every carrier. Existing encrypted keys are reused. Registration is subject to your 17TRACK account quota; FjordParcel does not fall back to scraping carrier websites. See the [17TRACK v2.2 API documentation](https://asset.17track.net/api/document/v2.2_en/index.html).

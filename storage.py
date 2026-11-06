@@ -1451,3 +1451,28 @@ def update_user_role(user_id, role):
         raise ValueError("Ugyldig rolle.")
     with get_connection() as db:
         db.execute("UPDATE users SET role=? WHERE id=?", (role, int(user_id)))
+
+
+def refresh_pending_tracking():
+    """Durable initial lookups, independent of the normal 30-minute refresh.
+
+    Claim in SQLite before network I/O so multiple web workers do not duplicate
+    the same retry. A crashed claim becomes eligible again after 60 seconds.
+    """
+    now = utc_now()
+    cutoff = (datetime.now(timezone.utc) - timedelta(seconds=60)).isoformat(timespec="seconds")
+    with get_connection() as db:
+        row = db.execute("""SELECT id, last_checked_at FROM shipments
+            WHERE tracking_source = '17track-api' AND status = 'Afventer 17TRACK'
+            AND COALESCE(archived_at, '') = ''
+            AND COALESCE(last_checked_at, '') < ?
+            ORDER BY COALESCE(last_checked_at, '') LIMIT 1""", (cutoff,)).fetchone()
+        if not row:
+            return False
+        claimed = db.execute("""UPDATE shipments SET last_checked_at = ?
+            WHERE id = ? AND COALESCE(last_checked_at, '') = ?
+            AND status = 'Afventer 17TRACK' AND COALESCE(archived_at, '') = ''""",
+            (now, row['id'], row['last_checked_at'] or '')).rowcount
+    if claimed:
+        refresh_shipment_tracking(row['id'])
+    return bool(claimed)

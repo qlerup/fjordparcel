@@ -37,3 +37,23 @@ def test_api_outage_preserves_last_known_events(client,monkeypatch):
     updated=storage.refresh_shipment_tracking(item['id'])
     assert updated['status']==item['status']
     assert updated['tracking_error']=='Quota exhausted'
+
+
+def test_pending_retry_survives_restart_and_throttles(client,monkeypatch):
+    _,item=storage.add_shipment('ABC12345')
+    with storage.get_connection() as db:
+        db.execute("UPDATE shipments SET status='Afventer 17TRACK', tracking_source='17track-api', last_checked_at='2000-01-01T00:00:00+00:00' WHERE id=?",(item['id'],))
+    assert client.get('/api/shipments/pending').json['pending_ids']==[item['id']]
+    calls=[]
+    def pending(number,**kw):
+        calls.append(number)
+        return TrackingLookupResult(tracking_number=number,status='Afventer 17TRACK',source='17track-api')
+    monkeypatch.setattr(storage,'fetch_tracking',pending)
+    assert storage.refresh_pending_tracking()
+    assert not storage.refresh_pending_tracking()
+    assert calls==['ABC12345']
+    with storage.get_connection() as db:
+        db.execute("UPDATE shipments SET last_checked_at='2000-01-01T00:00:00+00:00' WHERE id=?",(item['id'],))
+    monkeypatch.setattr(storage,'fetch_tracking',lambda number,**kw:TrackingLookupResult(tracking_number=number,status='Delivered',source='17track-api',carrier='DHL'))
+    assert storage.refresh_pending_tracking()
+    assert client.get('/api/shipments/pending').json['pending_ids']==[]

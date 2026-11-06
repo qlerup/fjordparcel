@@ -41,6 +41,14 @@ with tempfile.TemporaryDirectory() as folder:
         page.get_by_role('button',name='Tilføj pakke',exact=True).click()
         expect(page.locator('.shipment-item')).to_contain_text('ABC12345')
         assert len(storage.list_shipments())==1
+        # The intercepted POST follows Flask redirects internally; navigate to
+        # the canonical GET URL before testing location.reload().
+        page.goto('http://parcel.test/')
+        expect(page.locator('[data-pending-tracking]')).to_have_count(1)
+        with storage.get_connection() as db:
+            db.execute("UPDATE shipments SET status='In transit', last_event_text='Under transport'")
+        expect(page.locator('[data-pending-tracking]')).to_have_count(0,timeout=20000)
+        expect(page.locator('.shipment-item')).to_contain_text('Under transport')
         assert not errors,errors
         browser.close()
     print('PASS: manual form, mobile/desktop, real submit and saved result')

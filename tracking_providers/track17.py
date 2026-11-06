@@ -128,6 +128,8 @@ def _parse_response(data: dict[str, Any], number: str, carrier: str = "PostNord"
         )
 
     track_info = entry.get("track_info") if isinstance(entry.get("track_info"), dict) else {}
+    if not track_info or (not track_info.get("latest_event") and (track_info.get("latest_status") or {}).get("status") in (None, "NotFound")):
+        return _pending(number, carrier)
     latest_status = track_info.get("latest_status") if isinstance(track_info.get("latest_status"), dict) else {}
     latest_event_raw = track_info.get("latest_event") if isinstance(track_info.get("latest_event"), dict) else {}
     tracking = track_info.get("tracking") if isinstance(track_info.get("tracking"), dict) else {}
@@ -174,6 +176,12 @@ def _parse_response(data: dict[str, Any], number: str, carrier: str = "PostNord"
     )
 
 
+def _pending(number, carrier):
+    return TrackingLookupResult(carrier=carrier or "Ukendt", tracking_number=number,
+        status="Afventer 17TRACK", summary="17TRACK henter oplysninger fra fragtfirmaet. Vi prøver automatisk igen.",
+        tracking_url=_tracking_url(number), source="17track-api")
+
+
 def _response_error(data, number):
     if data.get("code", 0) != 0:
         return data.get("code"), "17TRACK afviste forespørgslen."
@@ -187,7 +195,9 @@ def _response_error(data, number):
 
 def fetch_track17_tracking(tracking_number: Any, carrier: str = "", postal_codes=None, timeout=None):
     number = normalize_tracking_number(tracking_number)
-    timeout_seconds = int(timeout or DEFAULT_TIMEOUT_SECONDS or 20)
+    # A first lookup can involve read + register + read; stay below the
+    # web worker's 30-second request timeout even if 17TRACK is slow.
+    timeout_seconds = max(1, min(8, int(timeout or DEFAULT_TIMEOUT_SECONDS or 20)))
     api_key = _get_api_key()
     def failure(message):
         return TrackingLookupResult(carrier=carrier or "Ukendt", tracking_number=number,
@@ -202,12 +212,13 @@ def fetch_track17_tracking(tracking_number: Any, carrier: str = "", postal_codes
             registration = _api_request("register", [{"number":number,"lang":"da"}], api_key, timeout_seconds)
             code, error = _response_error(registration, number)
             if code in (None, -18019901):
-                return TrackingLookupResult(carrier=carrier or "Ukendt", tracking_number=number,
-                    status="Afventer 17TRACK", summary="Nummeret er registreret. Tracking hentes ved næste opdatering.",
-                    tracking_url=_tracking_url(number), source="17track-api")
+                # Registration only starts 17TRACK's lookup; fetch immediately.
+                result = _api_request("gettrackinfo", [{"number":number}], api_key, timeout_seconds)
+                code, error = _response_error(result, number)
+                if code == -18019902:
+                    return _pending(number, carrier)
         if code == -18019909:
-            return TrackingLookupResult(carrier=carrier or "Ukendt", tracking_number=number,
-                status="Afventer 17TRACK", tracking_url=_tracking_url(number), source="17track-api")
+            return _pending(number, carrier)
         if code is not None:
             messages = {-18019908:"17TRACK-kvoten er opbrugt.", -18019907:"17TRACKs daglige grænse er nået.",
                 -18019903:"17TRACK kan ikke identificere fragtfirmaet for nummeret.",

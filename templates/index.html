@@ -5,7 +5,7 @@
 {%- endmacro %}
 
 {% macro render_shipment(shipment, show_archived, show_pickup_details=False) -%}
-  <article class="shipment-item{% if shipment.is_archived %} archived{% endif %}">
+  <article {% if shipment.status == "Afventer 17TRACK" %}data-pending-tracking="{{ shipment.id }}"{% endif %} class="shipment-item{% if shipment.is_archived %} archived{% endif %}">
     <div class="shipment-row" data-shipment-toggle role="button" tabindex="0" aria-expanded="false">
       <div class="tracking-cell">
         <a href="{{ shipment.tracking_url }}" target="_blank" rel="noreferrer">{{ shipment.tracking_number }}</a>
@@ -112,7 +112,11 @@
           </ol>
         </div>
       {% else %}
+        {% if shipment.status == 'Afventer 17TRACK' %}
+        <p class="events-empty" role="status">Henter tracking fra 17TRACK. Oplysningerne vises automatisk, så snart de er klar.</p>
+        {% else %}
         <p class="events-empty">Ingen hændelser endnu. Klik opdater for at hente tracking-data.</p>
+        {% endif %}
       {% endif %}
     </div>
   </article>

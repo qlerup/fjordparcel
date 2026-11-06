@@ -1005,6 +1005,14 @@ def _redirect_index_from_form():
     return redirect(url_for("index"))
 
 
+@app.get("/api/shipments/pending")
+def pending_shipments():
+    response = jsonify({"pending_ids": [s["id"] for s in list_shipments(current_user=session.get("user_id"))
+                                       if s.get("status") == "Afventer 17TRACK"]})
+    response.headers["Cache-Control"] = "no-store"
+    return response
+
+
 @app.post("/shipments")
 def create_shipment():
     tracking_number = request.form.get("tracking_number", "")
@@ -1691,12 +1699,23 @@ def _automation_worker():
         time.sleep(5)
 
 
+def _pending_tracking_worker():
+    from storage import refresh_pending_tracking
+    while True:
+        try:
+            refresh_pending_tracking()
+        except Exception:
+            app.logger.exception("Initial 17TRACK lookup failed")
+        time.sleep(5)
+
+
 def _ensure_automation_thread():
     global _AUTO_THREAD_STARTED
     if _AUTO_THREAD_STARTED:
         return
     th = threading.Thread(target=_automation_worker, name="automation-worker", daemon=True)
     th.start()
+    threading.Thread(target=_pending_tracking_worker, name="initial-tracking-worker", daemon=True).start()
     _AUTO_THREAD_STARTED = True
 
 

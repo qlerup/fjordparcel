@@ -31,7 +31,7 @@ def test_register_only_unregistered_number(monkeypatch):
         return {'code':0,'data':{'accepted':[{'number':'ABC12345'}]}}
     monkeypatch.setattr(track17,'_api_request',request)
     result=fetch_tracking('ABC12345')
-    assert calls==['gettrackinfo','register']
+    assert calls==['gettrackinfo','register','gettrackinfo']
     assert result.status=='Afventer 17TRACK' and not result.error
 
 
@@ -50,3 +50,17 @@ def test_missing_key_does_not_call_any_provider(monkeypatch):
 
 def test_response_never_uses_another_parcel():
     assert track17._parse_response(response('OTHER123'),'ABC12345').error
+
+
+def test_registration_fetches_ready_events_immediately(monkeypatch):
+    monkeypatch.setattr(track17,'_get_api_key',lambda:'test')
+    responses=iter([{'data':{'rejected':[{'number':'ABC12345','error':{'code':-18019902}}]}},
+                    {'code':0,'data':{'accepted':[{'number':'ABC12345'}]}}, response()])
+    monkeypatch.setattr(track17,'_api_request',lambda *a:next(responses))
+    result=fetch_tracking('ABC12345')
+    assert result.events and result.status_code=='InTransit'
+
+
+def test_empty_accepted_tracking_is_pending():
+    result=track17._parse_response({'data':{'accepted':[{'number':'ABC12345','track_info':None}]}},'ABC12345')
+    assert result.status=='Afventer 17TRACK' and not result.error

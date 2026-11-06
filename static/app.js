@@ -723,3 +723,29 @@ document.addEventListener("DOMContentLoaded", () => {
 
   window.addEventListener('resize', positionTabIndicator);
 }());
+
+
+// Pending initial lookups complete server-side even when this tab is closed.
+// Only reload an untouched overview when a displayed pending parcel is ready.
+(() => {
+  const pending = [...document.querySelectorAll('[data-pending-tracking]')].map(el => Number(el.dataset.pendingTracking));
+  if (!pending.length) return;
+  let dirty = false;
+  document.addEventListener('input', () => { dirty = true; });
+  async function check() {
+    try {
+      if (!document.hidden && !dirty) {
+        const response = await fetch('/api/shipments/pending', {cache: 'no-store'});
+        if (response.ok) {
+          const data = await response.json();
+          if (Array.isArray(data.pending_ids) && pending.some(id => !data.pending_ids.includes(id))) {
+            location.reload();
+            return;
+          }
+        }
+      }
+    } catch (_) { /* Retry on the next scheduled status check. */ }
+    setTimeout(check, 10000);
+  }
+  setTimeout(check, 10000);
+})();
