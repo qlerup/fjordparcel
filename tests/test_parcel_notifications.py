@@ -60,3 +60,34 @@ def test_initial_history_only_notifies_latest_and_existing_history_is_not_replay
     events.insert(0,{'date_iso':'2026-11-07T12:00:00Z','description':'Leveret','status':'Delivered'})
     storage.refresh_shipment_tracking(shipment['id'])
     assert len(queued())==1
+
+
+def test_bot_map_uses_snapshot_and_does_not_leak_internal_fields(db, monkeypatch):
+    import parcel_map
+    _, shipment = storage.add_shipment('MAP12345')
+    events = [dict(date_iso='2026-11-07T12:00:00Z', description='Ankommet', location='Aarhus'),
+              dict(date_iso='2026-11-06T12:00:00Z', description='Afsendt', location='Kolding')]
+    with storage.get_connection() as con:
+        con.execute('DELETE FROM parcel_notifications')
+        notifications.new_events(con, {'events_json': '[]', 'last_event_at': ''}, shipment, events)
+        con.execute('UPDATE shipments SET events_json=? WHERE id=?',
+                    (json.dumps([dict(location='Guangzhou, CN')]), shipment['id']))
+    captured = []
+    monkeypatch.setattr(parcel_map, 'render_map', lambda history: captured.append(history) or b'png')
+    sent = []
+    assert notifications.deliver_one(lambda path,payload: sent.append(payload) or {'ok':True,'queued':True})
+    assert captured == [events]
+    assert sent[0]['map_png'] == 'cG5n'
+    assert '_map_events' not in sent[0]
+
+
+def test_map_failure_keeps_text_notification_working(db, monkeypatch):
+    import parcel_map
+    _, shipment = storage.add_shipment('MAP12345')
+    with storage.get_connection() as con:
+        con.execute('DELETE FROM parcel_notifications')
+        notifications.enqueue(con, shipment, 'tracking_event', {'description':'På vej'}, events=[])
+    monkeypatch.setattr(parcel_map,'render_map',lambda history: (_ for _ in ()).throw(RuntimeError('map failed')))
+    sent=[]
+    assert notifications.deliver_one(lambda path,payload: sent.append(payload) or {'ok':True,'queued':True})
+    assert 'map_png' not in sent[0] and sent[0]['description']=='På vej'

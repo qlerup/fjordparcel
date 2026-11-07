@@ -90,6 +90,13 @@
     </div>
     <div class="shipment-details" data-shipment-details hidden>
       {% if shipment.events %}
+        <figure class="parcel-map" data-parcel-map>
+          <p role="status" data-map-status>Kortet indlæses…</p>
+          <img data-map-url="{{ url_for('shipment_map', shipment_id=shipment.id) }}" alt="Pakkens rute mellem de registrerede byer" width="960" height="460" hidden>
+          <figcaption>Byernes omtrentlige positioner. Pilen følger hændelsernes rækkefølge; orange viser senest kendte sted. Steder, der ikke kan findes, vises kun i listen.
+            <a href="{{ url_for('shipment_map', shipment_id=shipment.id) }}" target="_blank" rel="noopener">Åbn stort kort</a>
+          </figcaption>
+        </figure>
         <div class="tracking-events-wrap">
           <div class="tracking-events-head">Alle hændelser</div>
           <ol class="event-list tracking-timeline">

@@ -45,6 +45,28 @@ function toggleShipmentDetails(row) {
   const isExpanded = row.getAttribute("aria-expanded") === "true";
   row.setAttribute("aria-expanded", String(!isExpanded));
   details.hidden = isExpanded;
+  if (!isExpanded) {
+    const image = details.querySelector('[data-map-url]');
+    if (image && !image.dataset.loaded) {
+      image.dataset.loaded = 'true';
+      const status = details.querySelector('[data-map-status]');
+      fetch(image.dataset.mapUrl).then(async response => {
+        if (response.status === 204) {
+          status.textContent = 'Der er endnu ingen genkendelige byer at vise på kortet.';
+          return;
+        }
+        if (!response.ok || !response.headers.get('content-type')?.startsWith('image/png')) throw new Error('map');
+        const url = URL.createObjectURL(await response.blob());
+        image.onload = () => URL.revokeObjectURL(url);
+        image.src = url;
+        image.hidden = false;
+        status.hidden = true;
+      }).catch(() => {
+        status.textContent = 'Kortet kunne ikke hentes. Fold pakken sammen og prøv igen.';
+        delete image.dataset.loaded;
+      });
+    }
+  }
 }
 
 function pollScanStatus(form, progressBox, jobId) {

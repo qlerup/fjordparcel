@@ -96,3 +96,17 @@ The API key under **Indstillinger → Fragtfirmaer** applies to every carrier. E
 ### Bot notifications
 
 Managed installations send new parcel registrations and new 17TRACK events through FjordHub's existing Matrix bot recipients. Update both FjordHub and FjordParcel. Messages include parcel label, carrier, tracking number and Danish event details when supplied by 17TRACK. Delivery is queued transactionally and retried if Hub or the bot is unavailable. Repeated lookups and translation-only changes do not send duplicates; first lookup announces only the latest event. Hidden or deleted parcels are not sent from the pending outbox. Existing shipments are not announced again at installation.
+
+### Rutekort ved hændelser
+
+Når en pakke foldes ud, indlæses et lokalt genereret oversigtskort. Kendte byer
+vises med ét punkt pr. sted, pile følger hændelsernes rækkefølge, og orange
+markerer senest kendte sted. Ukendte eller tvetydige stednavne springes over.
+Linjerne viser forbindelser mellem hændelser, ikke vejnet eller GPS-positioner.
+Kortet bruger bundlet GeoNames- og Natural Earth-data uden eksterne API-nøgler;
+se `map_data/README.md` for dækning, licenser og opdatering af datagrundlaget.
+
+Nye trackinghændelser med genkendelige steder sender samme PNG-kort gennem
+FjordHubs botkø og som krypteret Matrix-billede. Begge apps og Matrix-botten
+skal opdateres. Allerede afsendte hændelser genudsendes ikke. Hvis der ingen
+kendte steder er, eller kortgenereringen fejler, sendes tekstbeskeden alene.

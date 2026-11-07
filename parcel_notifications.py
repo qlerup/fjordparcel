@@ -16,7 +16,7 @@ def event_key(event):
             event.get('location') or '']
 
 
-def enqueue(db, shipment, kind, event=None):
+def enqueue(db, shipment, kind, event=None, events=None):
     shipment = dict(shipment)
     if shipment.get('hidden_by'):
         return
@@ -27,6 +27,8 @@ def enqueue(db, shipment, kind, event=None):
                    label=shipment.get('label') or '', carrier=shipment.get('carrier') or '',
                    description=event.get('description') or '', occurred_at=event.get('date_iso') or '',
                    location=event.get('location') or '')
+    if events is not None:
+        payload['_map_events'] = events
     db.execute('INSERT OR IGNORE INTO parcel_notifications(event_id,shipment_id,payload) VALUES(?,?,?)',
                (ident, shipment['id'], json.dumps(payload)))
 
@@ -44,7 +46,7 @@ def new_events(db, previous, updated, events):
         candidates = candidates[:1]
     for event in reversed(candidates):
         if json.dumps(event_key(event)) not in known:
-            enqueue(db, updated, 'tracking_event', event)
+            enqueue(db, updated, 'tracking_event', event, events=events[events.index(event):])
 
 
 def deliver_one(send):
@@ -57,12 +59,32 @@ def deliver_one(send):
         if not db.execute('UPDATE parcel_notifications SET next_attempt=? WHERE event_id=? AND delivered=0 AND next_attempt<=?',
                           (now+60,row['event_id'],now)).rowcount:
             return False
-        shipment = db.execute('SELECT hidden_by FROM shipments WHERE id=?',(row['shipment_id'],)).fetchone()
+        shipment = db.execute('SELECT hidden_by, events_json FROM shipments WHERE id=?',(row['shipment_id'],)).fetchone()
         if not shipment or shipment['hidden_by']:
             db.execute('UPDATE parcel_notifications SET delivered=1 WHERE event_id=?',(row['event_id'],))
             return False
     try:
-        result = send('/api/hub/apps/notifications', json.loads(row['payload']))
+        payload = json.loads(row['payload'])
+        map_events = payload.pop('_map_events', None)
+        if payload.get('type') == 'tracking_event':
+            try:
+                import base64
+                from parcel_map import render_map
+                events = map_events if map_events is not None else json.loads(shipment['events_json'] or '[]')
+                # A delayed notification must not reveal later movements.
+                cutoff = payload.get('occurred_at')
+                if cutoff and map_events is None:
+                    from datetime import datetime, timezone
+                    def event_time(value):
+                        date = datetime.fromisoformat(value.replace('Z', '+00:00'))
+                        return date.replace(tzinfo=date.tzinfo or timezone.utc)
+                    events = [e for e in events if e.get('date_iso') and event_time(e['date_iso']) <= event_time(cutoff)]
+                image = render_map(events)
+                if image:
+                    payload['map_png'] = base64.b64encode(image).decode('ascii')
+            except Exception:
+                __import__('logging').getLogger(__name__).exception('Could not render parcel notification map')
+        result = send('/api/hub/apps/notifications', payload)
     except Exception:
         return False
     if result.get('ok') and (result.get('queued') or result.get('duplicate')):

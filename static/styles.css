@@ -1632,3 +1632,8 @@ code[hidden] {
 .modal-close:hover {
   background: var(--line);
 }
+
+.parcel-map { margin: 0 0 20px; overflow: hidden; border: 1px solid var(--border, #dce4ec); border-radius: 10px; }
+.parcel-map img { display: block; width: 100%; height: auto; }
+.parcel-map img[hidden] { display: none; }
+.parcel-map figcaption, .parcel-map > p { margin: 0; padding: 10px 12px; font-size: .8rem; line-height: 1.5; color: var(--muted, #64748b); }
