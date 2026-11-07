@@ -12,7 +12,8 @@ def init(db):
 
 def event_key(event):
     # Translation changes are not new carrier events.
-    return [event.get('date_iso') or '', event.get('status') or event.get('description') or '',
+    from tracking_text import localize_description
+    return [event.get('date_iso') or '', event.get('status') or localize_description(event.get('description')) or '',
             event.get('location') or '']
 
 
@@ -38,8 +39,9 @@ def new_events(db, previous, updated, events):
     known = {json.dumps(event_key(e)) for e in old if isinstance(e, dict)}
     if not old and previous['last_event_at']:
         # Existing installations: do not announce their old latest event on upgrade.
-        known.add(json.dumps([previous['last_event_at'], previous['status_code'] or previous['last_event_text'],
-                              previous['last_event_location']]))
+        known.add(json.dumps(event_key(dict(date_iso=previous['last_event_at'],
+            status=previous['status_code'], description=previous['last_event_text'],
+            location=previous['last_event_location']))))
     candidates = [e for e in events if isinstance(e, dict) and e.get('description')]
     if not old:
         # Initial lookup reports the latest event, not the parcel's entire history.
@@ -65,6 +67,8 @@ def deliver_one(send):
             return False
     try:
         payload = json.loads(row['payload'])
+        from tracking_text import localize_description
+        payload['description'] = localize_description(payload.get('description'))
         map_events = payload.pop('_map_events', None)
         if payload.get('type') == 'tracking_event':
             try:

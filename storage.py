@@ -345,6 +345,14 @@ def row_to_dict(row):
         parsed_events = []
 
     item["events"] = parsed_events if isinstance(parsed_events, list) else []
+    if item.get('tracking_source') == '17track-api':
+        from tracking_text import localize_description
+        for event in item['events']:
+            if isinstance(event, dict):
+                event['description'] = localize_description(
+                    event.get('description_original') or event.get('description'), event.get('description'))
+        for field in ('status', 'last_event_text'):
+            item[field] = localize_description(item.get(field))
     item["is_archived"] = bool(item.get("archived_at"))
     item["is_hidden"] = bool(item.get("hidden_by"))
     item["tracking_last_four_digits"] = tracking_digits[-4:] if len(tracking_digits) >= 4 else tracking_digits

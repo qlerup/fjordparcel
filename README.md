@@ -110,3 +110,11 @@ Nye trackinghændelser med genkendelige steder sender samme PNG-kort gennem
 FjordHubs botkø og som krypteret Matrix-billede. Begge apps og Matrix-botten
 skal opdateres. Allerede afsendte hændelser genudsendes ikke. Hvis der ingen
 kendte steder er, eller kortgenereringen fejler, sendes tekstbeskeden alene.
+
+### Danske hændelsestekster
+
+Kendte hændelser fra fragtfirmaerne får faste danske formuleringer i
+`tracking_text.py`, før 17TRACKs maskinoversættelse anvendes. Ukendte beskeder
+bevarer udbyderens detaljer. Originalteksten gemmes til senere forbedringer.
+Bekræftede fejloversættelser i eksisterende historik rettes ved visning og ved
+levering af ventende botbeskeder, uden at gamle hændelser genudsendes.

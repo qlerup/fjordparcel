@@ -91,3 +91,25 @@ def test_map_failure_keeps_text_notification_working(db, monkeypatch):
     sent=[]
     assert notifications.deliver_one(lambda path,payload: sent.append(payload) or {'ok':True,'queued':True})
     assert 'map_png' not in sent[0] and sent[0]['description']=='På vej'
+
+
+def test_better_danish_is_not_a_new_event_without_provider_status(db):
+    _, shipment = storage.add_shipment('TEXT12345')
+    old = dict(date_iso='2026-11-07T12:00:00Z', location='Langenhagen',
+               description='På vejen ankom jeg til faciliteten')
+    new = dict(old, description='Pakken er ankommet til en terminal')
+    previous = dict(events_json=json.dumps([old]), last_event_at=old['date_iso'])
+    with storage.get_connection() as con:
+        con.execute('DELETE FROM parcel_notifications')
+        notifications.new_events(con, previous, shipment, [new])
+    assert not queued()
+
+
+def test_queued_old_machine_translation_is_corrected_before_sending(db):
+    _, shipment = storage.add_shipment('TEXT12345')
+    with storage.get_connection() as con:
+        con.execute('DELETE FROM parcel_notifications')
+        notifications.enqueue(con, shipment, 'tracking_event', {'description':'På vejen ankom jeg til faciliteten'})
+    sent=[]
+    assert notifications.deliver_one(lambda path,payload: sent.append(payload) or {'ok':True,'queued':True})
+    assert sent[0]['description']=='Pakken er ankommet til en terminal'

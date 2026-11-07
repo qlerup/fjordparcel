@@ -10,6 +10,7 @@ from urllib import error as urllib_error
 from urllib import request as urllib_request
 
 from .common import TrackingLookupResult, normalize_tracking_number
+from tracking_text import localize_description
 
 POSTNORD_TRACKING_URL = "https://t.17track.net/da#nums={tracking_number}"
 TRACK17_API_BASE = "https://api.17track.net/track/v2.2"
@@ -70,9 +71,12 @@ def _parse_event(event: dict[str, Any]) -> dict[str, Any]:
     location = _text(event.get("location") or "").replace("Denmark", "Danmark")
     translation = event.get("description_translation")
     translated = translation.get("description") if isinstance(translation, dict) and translation.get("lang") == "da" else ""
-    description = _text(translated) or _to_danish_text(_text(event.get("description") or ""))
+    original = _text(event.get("description") or "")
+    description = localize_description(original, _text(translated))
+    description = _to_danish_text(description)
     return {
         "description": description,
+        "description_original": original,
         "status": _text(event.get("sub_status") or event.get("stage") or ""),
         "date_iso": date_iso,
         "display_date": display_date,
