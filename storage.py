@@ -319,6 +319,9 @@ def _ensure_shipments_columns(db):
         "last_event_at": "TEXT NOT NULL DEFAULT ''",
         "last_event_text": "TEXT NOT NULL DEFAULT ''",
         "last_event_location": "TEXT NOT NULL DEFAULT ''",
+        "estimated_delivery_from": "TEXT NOT NULL DEFAULT ''",
+        "estimated_delivery_to": "TEXT NOT NULL DEFAULT ''",
+        "estimated_delivery_source": "TEXT NOT NULL DEFAULT ''",
         "events_json": "TEXT NOT NULL DEFAULT '[]'",
         "label_source": "TEXT NOT NULL DEFAULT ''",
         "tracking_reference": "TEXT NOT NULL DEFAULT ''",
@@ -358,6 +361,12 @@ def row_to_dict(row):
     item["is_archived"] = bool(item.get("archived_at"))
     item["is_hidden"] = bool(item.get("hidden_by"))
     item["tracking_last_four_digits"] = tracking_digits[-4:] if len(tracking_digits) >= 4 else tracking_digits
+    from delivery_estimate import display_estimate
+    item['delivery_estimate'] = display_estimate(item.get('estimated_delivery_from'),
+                                               item.get('estimated_delivery_to'),
+                                               item.get('estimated_delivery_source'))
+    item['show_delivery_estimate'] = classify_shipment_status(
+        item.get('carrier'), item.get('status'), item.get('status_code'), item.get('last_event_text')) == 'in_transit'
     return item
 
 
@@ -1234,6 +1243,10 @@ def refresh_shipment_tracking(shipment_id):
         max_length=180,
     )
     events_json = json.dumps((result.events or [])[:30], ensure_ascii=False)
+    from delivery_estimate import normalize_estimate
+    estimate = normalize_estimate({'from': result.estimated_delivery_from,
+                                   'to': result.estimated_delivery_to,
+                                   'source': result.estimated_delivery_source})
     delivered_at = _delivery_fields_for_result(shipment, result, status, now)
 
     with get_connection() as db:
@@ -1257,6 +1270,9 @@ def refresh_shipment_tracking(shipment_id):
                 last_event_location = ?,
                 pickup_location = ?,
                 events_json = ?,
+                estimated_delivery_from = ?,
+                estimated_delivery_to = ?,
+                estimated_delivery_source = ?,
                 tracking_url = ?,
                 tracking_reference = ?,
                 tracking_source = ?,
@@ -1277,6 +1293,9 @@ def refresh_shipment_tracking(shipment_id):
                 normalize_text(result.last_event_location, max_length=220),
                 pickup_location,
                 events_json,
+                estimate['from'],
+                estimate['to'],
+                estimate['source'],
                 tracking_url,
                 tracking_reference,
                 normalize_text(result.source, max_length=120),

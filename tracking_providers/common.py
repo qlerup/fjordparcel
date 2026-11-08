@@ -21,6 +21,9 @@ class TrackingLookupResult:
     reference_number: str = ""
     source: str = ""
     error: str = ""
+    estimated_delivery_from: str = ""
+    estimated_delivery_to: str = ""
+    estimated_delivery_source: str = ""
 
     def as_dict(self) -> dict[str, Any]:
         return {
@@ -38,6 +41,9 @@ class TrackingLookupResult:
             "reference_number": self.reference_number,
             "source": self.source,
             "error": self.error,
+            "estimated_delivery_from": self.estimated_delivery_from,
+            "estimated_delivery_to": self.estimated_delivery_to,
+            "estimated_delivery_source": self.estimated_delivery_source,
         }
 
 

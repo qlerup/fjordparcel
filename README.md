@@ -93,6 +93,17 @@ Use **Tilføj trackingnummer** at the top of the parcel overview; an optional la
 
 The API key under **Indstillinger → Fragtfirmaer** applies to every carrier. Existing encrypted keys are reused. Registration is subject to your 17TRACK account quota; FjordParcel does not fall back to scraping carrier websites. See the [17TRACK v2.2 API documentation](https://asset.17track.net/api/document/v2.2_en/index.html).
 
+### Forventet levering
+
+17TRACKs `time_metrics.estimated_delivery_date` gemmes ved trackingopdatering.
+En dato, et datointerval eller en tidligst-/senest-dato vises under seneste hændelse
+for pakker på vej. Datoerne følger fragtfirmaets angivne kalenderdato, uden at
+midnat eller tekniske tidsstempler vises som et præcist leveringstidspunkt.
+Markøren viser, om estimatet kommer fra fragtfirmaet eller 17TRACK. Manglende dato
+vises som **Ikke oplyst endnu**. En fejlet API-opdatering bevarer seneste estimat;
+et vellykket svar uden dato fjerner det. Afhentningsklare og leverede pakker viser
+ikke længere forventet levering. Ingen ekstra API-kald er nødvendige.
+
 ### Bot notifications
 
 Managed installations send new parcel registrations and new 17TRACK events through FjordHub's existing Matrix bot recipients. Update both FjordHub and FjordParcel. Messages include parcel label, carrier, tracking number and Danish event details when supplied by 17TRACK. Delivery is queued transactionally and retried if Hub or the bot is unavailable. Repeated lookups and translation-only changes do not send duplicates; first lookup announces only the latest event. Hidden or deleted parcels are not sent from the pending outbox. Existing shipments are not announced again at installation.

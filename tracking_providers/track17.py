@@ -11,6 +11,7 @@ from urllib import request as urllib_request
 
 from .common import TrackingLookupResult, normalize_tracking_number
 from tracking_text import localize_description
+from delivery_estimate import normalize_estimate
 
 POSTNORD_TRACKING_URL = "https://t.17track.net/da#nums={tracking_number}"
 TRACK17_API_BASE = "https://api.17track.net/track/v2.2"
@@ -166,6 +167,8 @@ def _parse_response(data: dict[str, Any], number: str, carrier: str = "PostNord"
             detected_carrier = canonical
             break
 
+    metrics = track_info.get('time_metrics')
+    estimate = normalize_estimate(metrics.get('estimated_delivery_date') if isinstance(metrics, dict) else None)
     return TrackingLookupResult(
         carrier=detected_carrier,
         tracking_number=number,
@@ -179,6 +182,9 @@ def _parse_response(data: dict[str, Any], number: str, carrier: str = "PostNord"
         tracking_url=_tracking_url(number),
         source="17track-api",
         error="",
+        estimated_delivery_from=estimate['from'],
+        estimated_delivery_to=estimate['to'],
+        estimated_delivery_source=estimate['source'],
     )
 
 

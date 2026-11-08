@@ -31,6 +31,7 @@ with tempfile.TemporaryDirectory() as folder:
     with storage.get_connection() as db:
         db.execute('UPDATE shipments SET events_json=?,status=?,last_event_text=?,status_code=? WHERE id=?',
                    (json.dumps(events),'Pakken er ankommet til en terminal','Pakken er ankommet til en terminal','InTransit',shipment['id']))
+        db.execute("UPDATE shipments SET estimated_delivery_to='2026-11-10', estimated_delivery_source='Official' WHERE id=?", (shipment['id'],))
     client = module.app.test_client()
     with client.session_transaction() as session:
         session['user_id'] = 'tester'
@@ -54,6 +55,8 @@ with tempfile.TemporaryDirectory() as folder:
             page.goto('http://parcel.test/')
             expect(page.locator('.group-head').filter(has_text='Klar til afhentning')).to_have_count(0)
             expect(page.locator('.group-head').filter(has_text='På vej')).to_contain_text('(1)')
+            expect(page.locator('[data-delivery-estimate]')).to_contain_text('Senest 10-11-2026')
+            expect(page.locator('.brand-logo')).to_have_attribute('src', __import__('re').compile('.*horizontal-light.png.*'))
             count = len(requests)
             expect(page.locator('[data-shipment-details]')).to_be_hidden()
             assert len(requests) == count

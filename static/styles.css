@@ -1655,3 +1655,7 @@ code[hidden] {
 .parcel-map-dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; background: #e58c35; margin-right: 3px; }
 .parcel-map-key { display: inline-block; width: 20px; border-top: 3px solid #196b61; vertical-align: middle; margin: 0 3px 0 12px; }
 .parcel-map-key.is-estimate { border-top: 2px dashed #677c87; }
+.last-event-cell .delivery-estimate { margin-top: 7px; font-size: .78rem; line-height: 1.45; }
+.delivery-estimate > span:first-child { display: block; }
+.delivery-estimate strong { color: var(--pine-dark); font-weight: 700; }
+.delivery-estimate-unknown { font-weight: 400; }

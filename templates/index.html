@@ -46,6 +46,16 @@
         {% else %}
           <strong>-</strong>
         {% endif %}
+        {% if shipment.show_delivery_estimate %}
+          <small class="delivery-estimate" data-delivery-estimate>
+            <span>Forventet levering:</span>
+            {% if shipment.delivery_estimate %}
+              <strong title="{{ shipment.delivery_estimate.source }} · datoen er vejledende">{{ shipment.delivery_estimate.label }}</strong>
+            {% else %}
+              <span class="delivery-estimate-unknown">Ikke oplyst endnu</span>
+            {% endif %}
+          </small>
+        {% endif %}
       </div>
       <div class="muted-text">
         {% if shipment.mail_received_at %}
