@@ -91,10 +91,11 @@
     <div class="shipment-details" data-shipment-details hidden>
       {% if shipment.events %}
         <figure class="parcel-map" data-parcel-map>
+          <div class="parcel-map-heading"><strong>Pakkens rejse</strong><button type="button" class="parcel-map-expand" data-map-expand aria-pressed="false">Stort kort</button></div>
           <p role="status" data-map-status>Kortet indlæses…</p>
-          <img data-map-url="{{ url_for('shipment_map', shipment_id=shipment.id) }}" alt="Pakkens rute mellem de registrerede byer" width="960" height="460" hidden>
-          <figcaption>Byernes omtrentlige positioner. Pilen følger hændelsernes rækkefølge; orange viser senest kendte sted. Steder, der ikke kan findes, vises kun i listen.
-            <a href="{{ url_for('shipment_map', shipment_id=shipment.id) }}" target="_blank" rel="noopener">Åbn stort kort</a>
+          <div class="parcel-map-canvas" data-map-url="{{ url_for('shipment_route', shipment_id=shipment.id) }}" role="region" aria-label="Kort over pakkens rejse" hidden></div>
+          <figcaption><span class="parcel-map-dot" aria-hidden="true"></span> Senest kendte sted <span class="parcel-map-key" aria-hidden="true"></span> Beregnet lastbilrute <span class="parcel-map-key is-estimate" aria-hidden="true"></span> Forbindelse uden vejdata
+            <p>Byernes positioner er omtrentlige. Ruten mellem scanningerne er et forslag til transportvejen.</p>
           </figcaption>
         </figure>
         <div class="tracking-events-wrap">

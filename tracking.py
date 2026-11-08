@@ -156,8 +156,10 @@ def classify_shipment_status(carrier="", status="", status_code="", last_event_t
         "pakke shop",
         "pakke shoppen",
         "klar til afhentning",
-        "ankommet til",
+        "ankommet til afhentningssted",
         "arrived at parcelshop",
+        "ready for pickup",
+        "available for pickup",
     )
     if any(marker in text for marker in ready_markers):
         return "ready"

@@ -48,6 +48,22 @@ def test_classifies_dao_udleveret_as_delivered():
     assert classify_shipment_status(carrier="DAO", last_event_text="Pakken er udleveret") == "delivered"
 
 
+def test_terminal_arrivals_are_in_transit_including_existing_ups_data():
+    for text in ('Pakken er ankommet til en terminal',
+                 'Pakken er ankommet til distributionscentret',
+                 'Pakken er ankommet til den lokale FedEx-terminal',
+                 'Pakken er ankommet til Langenhagen'):
+        assert classify_shipment_status(carrier='UPS', status=text, status_code='InTransit', last_event_text=text) == 'in_transit'
+        assert classify_shipment_status(status=text) == 'in_transit'
+
+
+def test_real_collection_and_delivery_statuses_are_preserved():
+    for text in ('Pakken er klar til afhentning', 'Pakken er ankommet til pakkeshoppen',
+                 'Pakken er ankommet til afhentningsstedet', 'Available for pickup'):
+        assert classify_shipment_status(last_event_text=text) == 'ready'
+    assert classify_shipment_status(status_code='Delivered', last_event_text='Pakken er leveret') == 'delivered'
+
+
 def test_extracts_dao_udleveret_event_from_mail_text():
     text = "dao har nyt om din pakke. Pakken er udleveret. Pakkenr.: 00057151273676436276"
 

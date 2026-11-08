@@ -114,6 +114,8 @@ def init_db():
     with get_connection() as db:
         from parcel_notifications import init
         init(db)
+        from parcel_routes import init as init_routes
+        init_routes(db)
         db.execute(
             """
             CREATE TABLE IF NOT EXISTS shipments (

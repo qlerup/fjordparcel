@@ -1019,6 +1019,19 @@ def shipment_map(shipment_id):
     return response
 
 
+@app.get("/shipments/<int:shipment_id>/route.json")
+def shipment_route(shipment_id):
+    from flask import abort
+    from storage import get_shipment
+    from parcel_routes import route_overview
+    shipment = get_shipment(shipment_id)
+    if not shipment or (shipment.get('hidden_by') and shipment['hidden_by'] != session.get('user_id')):
+        abort(404)
+    response = jsonify(route_overview(shipment.get('events') or []))
+    response.headers['Cache-Control'] = 'private, no-store'
+    return response
+
+
 @app.get("/api/shipments/pending")
 def pending_shipments():
     response = jsonify({"pending_ids": [s["id"] for s in list_shipments(current_user=session.get("user_id"))

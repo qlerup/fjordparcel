@@ -59,3 +59,25 @@ def test_map_endpoint_requires_login_and_obeys_hidden_visibility(tmp_path, monke
     storage.set_shipment_hidden(shipment['id'], 'someone-else')
     assert client.get(url).status_code == 404
     assert client.get('/shipments/999999/map.png').status_code == 404
+
+
+def test_route_endpoint_auth_visibility_and_no_city_state(tmp_path, monkeypatch):
+    import app as web
+    import storage
+    monkeypatch.setattr(storage, 'DATABASE_PATH', str(tmp_path/'test.db'))
+    storage.init_db()
+    monkeypatch.setattr(web, '_fjordhub_managed', lambda: True)
+    web.app.config.update(TESTING=True, SECRET_KEY='test-secret')
+    _, shipment = storage.add_shipment('ROUTE12345')
+    url = f"/shipments/{shipment['id']}/route.json"
+    client = web.app.test_client()
+    assert client.get(url).status_code == 302
+    with client.session_transaction() as session:
+        session['user_id'] = 'tester'
+    response = client.get(url)
+    assert response.status_code == 200
+    assert response.json == {'points': [], 'segments': [], 'pending': False}
+    assert response.headers['Cache-Control'] == 'private, no-store'
+    storage.set_shipment_hidden(shipment['id'], 'someone-else')
+    assert client.get(url).status_code == 404
+    assert client.get('/shipments/999999/route.json').status_code == 404

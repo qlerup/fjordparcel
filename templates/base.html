@@ -17,7 +17,10 @@
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="msapplication-TileColor" content="#0F3D36">
     <meta name="msapplication-config" content="{{ url_for('static', filename='logos/web/browserconfig.xml', v='brand-20261005') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='vendor/leaflet/leaflet.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='styles.css', v=app_build) }}">
+    <script src="{{ url_for('static', filename='vendor/leaflet/leaflet.js') }}" defer></script>
+    <script src="{{ url_for('static', filename='parcel-map.js', v=app_build) }}" defer></script>
     <script src="{{ url_for('static', filename='app.js', v=app_build) }}" defer></script>
   <link rel="stylesheet" href="/static/hub-session.css?v=email-update1"><script defer src="/static/hub-session.js?v=email-update1"></script>
 </head>

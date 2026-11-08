@@ -99,12 +99,29 @@ Managed installations send new parcel registrations and new 17TRACK events throu
 
 ### Rutekort ved hændelser
 
-Når en pakke foldes ud, indlæses et lokalt genereret oversigtskort. Kendte byer
-vises med ét punkt pr. sted, pile følger hændelsernes rækkefølge, og orange
-markerer senest kendte sted. Ukendte eller tvetydige stednavne springes over.
-Linjerne viser forbindelser mellem hændelser, ikke vejnet eller GPS-positioner.
-Kortet bruger bundlet GeoNames- og Natural Earth-data uden eksterne API-nøgler;
+Når en pakke foldes ud, indlæses et interaktivt Leaflet-kort som i Urban Explorer.
+Vælg mellem OpenStreetMap-vejkort og Esri-satellit, zoom eller åbn et større kort.
+Kendte byer vises i hændelsesrækkefølge, og orange markerer senest kendte sted.
+Ukendte eller tvetydige stednavne springes over. Byopslaget bruger bundlet GeoNames;
 se `map_data/README.md` for dækning, licenser og opdatering af datagrundlaget.
+
+Den eksterne Valhalla-server beregner foreslåede lastbilruter mellem efterfølgende
+byer. Der installeres ingen vejnetdata lokalt. Det er en illustration af mulig
+transport, ikke transportørens faktiske GPS-rute. Vellykkede delruter gemmes uden
+udløb i SQLite-tabellen `parcel_route_cache` og genbruges på tværs af pakker,
+sidevisninger og genstarter. Retning, server og profil indgår i cachenøglen.
+Kun nye delruter beregnes, når en ny scanning kommer til. Database-leases forhindrer
+parallelle forespørgsler i at beregne samme delrute. Beregningen kører i baggrunden
+med to arbejdstråde og højst 32 ventende/beregnende jobs pr. proces. Der startes
+højst 64 delruter pr. kortvisning. Midlertidige fejl forsøges igen efter en time,
+manglende vejforbindelser efter et døgn. Stiplede linjer viser forbindelser uden
+vejdata, fx ved flytransport eller manglende dækning.
+
+`FJORDPARCEL_VALHALLA_URL` vælger ruteserver (standard:
+`https://valhalla1.openstreetmap.de`). En tom værdi slår ruteberegning fra.
+Kun bykoordinater og lastbilprofil sendes til ruteserveren, ingen trackingnumre
+eller hændelsestekster. Browseren henter kortfliser fra den valgte kortudbyder.
+Leaflet 1.9.4 med BSD-licens er bundlet under `static/vendor/leaflet`.
 
 Nye trackinghændelser med genkendelige steder sender samme PNG-kort gennem
 FjordHubs botkø og som krypteret Matrix-billede. Begge apps og Matrix-botten
