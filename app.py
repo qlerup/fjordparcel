@@ -105,6 +105,8 @@ APP_BUILD = os.getenv("APP_BUILD", str(max(
     if os.path.exists(os.path.join(os.path.dirname(__file__), "static", "styles.css")) else 0,
     int(os.path.getmtime(os.path.join(os.path.dirname(__file__), "static", "app.js")))
     if os.path.exists(os.path.join(os.path.dirname(__file__), "static", "app.js")) else 0,
+    int(os.path.getmtime(os.path.join(os.path.dirname(__file__), "static", "parcel-map.js")))
+    if os.path.exists(os.path.join(os.path.dirname(__file__), "static", "parcel-map.js")) else 0,
 )))
 
 APP_UPDATE_SERVICE_URL = str(os.environ.get("FJORDPARCEL_UPDATER_URL", "http://fjordparcel-updater:8090") or "").strip().rstrip("/")

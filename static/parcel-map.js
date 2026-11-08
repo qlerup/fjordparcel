@@ -11,7 +11,7 @@
     const L = window.L;
     if (!L) throw new Error('Leaflet unavailable');
     canvas.hidden = false;
-    const map = L.map(canvas, {scrollWheelZoom: false, maxZoom: 19});
+    const map = L.map(canvas, {scrollWheelZoom: true, maxZoom: 19});
     const streets = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
       maxNativeZoom: 19,
       attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
