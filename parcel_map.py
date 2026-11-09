@@ -32,6 +32,14 @@ def gazetteer():
         for alias in {normalize(alias) for alias in city[5]}:
             if len(alias) > 2:
                 index.setdefault(alias, []).append(city)
+    # Carrier locations also use postal districts, e.g. HOLMEGAARD, DK, DK.
+    # These are not necessarily populated-place entries in GeoNames.
+    with gzip.open(DATA / 'postal-dk.json.gz', 'rt', encoding='utf-8') as source:
+        postal = json.load(source)
+    for district in postal:
+        for alias in {normalize(name) for name in district[5]}:
+            if len(alias) > 2 and alias not in index:
+                index[alias] = [district]
     for code, aliases, _ in countries:
         for alias in aliases:
             if alias:

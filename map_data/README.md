@@ -18,3 +18,9 @@ route overview, not a GPS track, road route, or estimate of delivery distance.
 Small towns outside Denmark may not appear in the bundled gazetteer.
 
 * `DejaVuSans.ttf`: DejaVu Sans for Danish city labels; see FONT-LICENSE.txt.
+
+* `postal-dk.json.gz`: Danish postal district names and approximate centres from
+  GeoNames postal data, generated 2026-11-09. This supplements the city index
+  for carrier labels such as Holmegaard. Same CC BY 4.0 attribution as above.
+  Source: https://download.geonames.org/export/zip/ . Refresh independently with
+  `python scripts/update_map_data.py --postal-only`.

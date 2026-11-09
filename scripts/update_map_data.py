@@ -2,12 +2,36 @@
 import gzip
 import io
 import json
+import sys
+from collections import defaultdict
 from pathlib import Path
 import urllib.request
 import zipfile
 
 ROOT = Path(__file__).resolve().parents[1] / 'map_data'
 ROOT.mkdir(exist_ok=True)
+def update_postal_data():
+    with urllib.request.urlopen('https://download.geonames.org/export/zip/DK.zip', timeout=60) as response:
+        archive = zipfile.ZipFile(io.BytesIO(response.read()))
+    districts = defaultdict(list)
+    for line in archive.read('DK.txt').decode().splitlines():
+        fields = line.split('\t')
+        districts[fields[2]].append((float(fields[9]), float(fields[10])))
+    postal = []
+    for name, points in sorted(districts.items()):
+        # Postal districts can contain many postal codes; use their centre.
+        lat = round(sum(p[0] for p in points)/len(points), 5)
+        lon = round(sum(p[1] for p in points)/len(points), 5)
+        postal.append([name, 'DK', lat, lon, 0, [name]])
+    with gzip.open(ROOT / 'postal-dk.json.gz', 'wt', encoding='utf-8') as out:
+        json.dump(postal, out, ensure_ascii=False, separators=(',', ':'))
+    print(f'Bundled {len(postal)} Danish postal districts')
+
+
+update_postal_data()
+if '--postal-only' in sys.argv:
+    raise SystemExit(0)
+
 rows = {}
 for name in ('cities15000', 'DK'):
     with urllib.request.urlopen(f'https://download.geonames.org/export/dump/{name}.zip', timeout=90) as response:

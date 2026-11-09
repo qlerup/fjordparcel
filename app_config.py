@@ -258,7 +258,7 @@ DEFAULT_AUTOMATION_SETTINGS = {
     "auto_scan_enabled": "0",
     "auto_scan_minutes": "30",
     "auto_refresh_enabled": "1",
-    # Tracking opdateres altid hver 30. minut (ingen felter nødvendig)
+    # Tracking opdateres hvert 5. minut (ingen felter nødvendig)
 }
 
 

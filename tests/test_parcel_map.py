@@ -81,3 +81,15 @@ def test_route_endpoint_auth_visibility_and_no_city_state(tmp_path, monkeypatch)
     storage.set_shipment_hidden(shipment['id'], 'someone-else')
     assert client.get(url).status_code == 404
     assert client.get('/shipments/999999/route.json').status_code == 404
+
+
+def test_carrier_postal_district_is_included_as_latest_stop():
+    district = locate('HOLMEGAARD, DK, DK')
+    assert district and district[0] == 'Holmegaard' and district[1] == 'DK'
+    assert 55.2 < district[2] < 55.35 and 11.7 < district[3] < 11.95
+    assert locate('HOLMEGAARD, DE') is None
+    route = route_points([event('HOLMEGAARD, DK, DK', 9), event('HVIDOVRE, DK', 8),
+                          event('LANGENHAGEN, NS, DE', 7)])
+    assert [p[0] for p in route][-1] == 'Holmegaard'
+    assert len(route) == 3
+    assert render_map([event('HOLMEGAARD, DK, DK', 9), event('HVIDOVRE, DK', 8)])

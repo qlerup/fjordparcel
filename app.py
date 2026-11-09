@@ -158,7 +158,6 @@ POSTNORD_PICKUP_LINK_MAX_BYTES = 250_000
 
 # Automation scheduler state
 _AUTO_NEXT_SCAN_AT = {}
-_AUTO_NEXT_REFRESH_AT = 0.0
 _AUTO_THREAD_STARTED = False
 _AUTO_LEADER_OWNER_ID = uuid.uuid4().hex
 _AUTO_IS_LEADER = False
@@ -1658,7 +1657,7 @@ def hub_user(user_id: int):
 
 
 def _automation_worker():
-    global _AUTO_NEXT_SCAN_AT, _AUTO_NEXT_REFRESH_AT, _AUTO_IS_LEADER, _AUTO_NEXT_HEARTBEAT_AT
+    global _AUTO_NEXT_SCAN_AT, _AUTO_IS_LEADER, _AUTO_NEXT_HEARTBEAT_AT
     while True:
         try:
             now = time.time()
@@ -1685,7 +1684,6 @@ def _automation_worker():
             except Exception:
                 pass
 
-            cfg = load_automation_settings()
             now = time.time()
             # Auto mail scan is configured per connected mail account.
             accounts = {
@@ -1710,21 +1708,20 @@ def _automation_worker():
                         app.logger.exception("Auto mail scan failed for %s/%s", account.get("provider"), account.get("username"))
                     _AUTO_NEXT_SCAN_AT[key] = now + int(scan_cfg.get("auto_scan_minutes", 30)) * 60
 
-            # Auto tracking refresh (randomized interval)
-            if cfg.get("auto_refresh_enabled"):
-                if now >= _AUTO_NEXT_REFRESH_AT:
-                    try:
-                        for s in list_shipments(include_archived=True):
-                            try:
-                                refresh_shipment_tracking(s["id"])
-                            except Exception:
-                                continue
-                    finally:
-                        # Fast hvert 30. minut (ingen randomisering)
-                        _AUTO_NEXT_REFRESH_AT = now + 30 * 60
         except Exception:
             # Never crash the loop
             pass
+        time.sleep(5)
+
+
+def _tracking_refresh_worker():
+    from tracking_refresh import refresh_due_shipments
+    while True:
+        try:
+            if load_automation_settings().get('auto_refresh_enabled'):
+                refresh_due_shipments()
+        except Exception:
+            app.logger.exception('Automatic tracking refresh failed')
         time.sleep(5)
 
 
@@ -1755,6 +1752,7 @@ def _ensure_automation_thread():
         return
     th = threading.Thread(target=_automation_worker, name="automation-worker", daemon=True)
     th.start()
+    threading.Thread(target=_tracking_refresh_worker, name='tracking-refresh', daemon=True).start()
     threading.Thread(target=_pending_tracking_worker, name="initial-tracking-worker", daemon=True).start()
     threading.Thread(target=_parcel_notification_worker, name="parcel-notifications", daemon=True).start()
     _AUTO_THREAD_STARTED = True

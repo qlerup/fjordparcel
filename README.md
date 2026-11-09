@@ -8,7 +8,7 @@ A self-hosted parcel tracker that scans connected mailboxes and collects trackin
 - Multiple connected mail accounts, individual scan settings, background scanning and scan progress.
 - Parcel extraction for DAO, PostNord, GLS and Bring. The mail parser also recognizes FedEx references and tracking links.
 - Manual parcel entry, labels, refresh, archive/restore and hide/unhide controls.
-- Optional background mail scanning and tracking refresh; tracking updates run every 30 minutes when enabled.
+- Optional background mail scanning and tracking refresh; active parcels are checked every 5 minutes when tracking refresh is enabled, independently of mail scanning.
 - All parcel status updates use the official 17TRACK API and the existing encrypted API key. Carrier websites are not used for tracking lookups.
 - Administrator and regular-user roles, hashed passwords and temporary login lockout.
 - FjordHub shared accounts, SSO, first-login onboarding and active-session access checks.
