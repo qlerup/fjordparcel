@@ -1,4 +1,5 @@
 import io
+import pytest
 from PIL import Image
 from parcel_map import locate, route_points, render_map
 
@@ -52,6 +53,8 @@ def test_map_endpoint_requires_login_and_obeys_hidden_visibility(tmp_path, monke
     assert client.get(url).status_code == 302
     with client.session_transaction() as session:
         session['user_id'] = 'test'
+    import parcel_map_image
+    monkeypatch.setattr(parcel_map_image, 'render_map_image', lambda events: b'test-png')
     response = client.get(url)
     assert response.status_code == 200
     assert response.mimetype == 'image/png'
@@ -93,3 +96,27 @@ def test_carrier_postal_district_is_included_as_latest_stop():
     assert [p[0] for p in route][-1] == 'Holmegaard'
     assert len(route) == 3
     assert render_map([event('HOLMEGAARD, DK, DK', 9), event('HVIDOVRE, DK', 8)])
+
+
+@pytest.mark.parametrize('carrier_name,danish_name', [
+    ('4600 Koege DK', 'Køge, DK'),
+    ('KOEGE, DK', 'Køge, DK'),
+    ('Roedovre, DK', 'Rødovre, DK'),
+    ('Broendby, DK', 'Brøndby, DK'),
+    ('Aeroeskoebing, DK', 'Ærøskøbing, DK'),
+    ('Aabenraa, DK', 'Åbenrå, DK'),
+    ('Saeby, DK', 'Sæby, DK'),
+])
+def test_danish_carrier_transliterations_match_same_place(carrier_name, danish_name):
+    assert locate(danish_name) is not None
+    assert locate(carrier_name) == locate(danish_name)
+
+
+def test_transliterated_latest_stop_is_included_and_not_duplicated():
+    events = [event('4600 Koege DK', 9), event('Køge, DK', 8), event('63741 Aschaffenburg DE', 7)]
+    points = route_points(events)
+    assert len(points) == 2
+    assert points[-1] == locate('Køge, DK')
+    assert points[-1][0] == 'Køge'
+    assert locate('Koege, DE') is None
+    assert locate('Unknown Koegedepot DK') is None

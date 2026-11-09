@@ -7,14 +7,15 @@
     return node;
   };
 
-  function create(canvas, figure) {
+  function create(canvas, figure, snapshot = false) {
     const L = window.L;
     if (!L) throw new Error('Leaflet unavailable');
     canvas.hidden = false;
-    const map = L.map(canvas, {scrollWheelZoom: true, maxZoom: 19});
-    const streets = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      maxNativeZoom: 19,
-      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+    const map = L.map(canvas, {scrollWheelZoom: true, maxZoom: 19, zoomAnimation: !snapshot, fadeAnimation: !snapshot});
+    const streets = L.maplibreGL({
+      style: 'https://tiles.openfreemap.org/styles/liberty',
+      preserveDrawingBuffer: snapshot,
+      attributionControl: {customAttribution: '<a href="https://openfreemap.org/">OpenFreeMap</a> &copy; <a href="https://www.openmaptiles.org/">OpenMapTiles</a> &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'},
     }).addTo(map);
     const satellite = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
       maxNativeZoom: 19,
@@ -32,7 +33,7 @@
       event.currentTarget.textContent = expanded ? 'Lille kort' : 'Stort kort';
       map.invalidateSize({pan: false});
     });
-    return {map, lines: L.layerGroup().addTo(map), markers: L.layerGroup().addTo(map)};
+    return {map, basemap: streets, lines: L.layerGroup().addTo(map), markers: L.layerGroup().addTo(map)};
   }
 
   function draw(state, data, status) {
@@ -126,6 +127,26 @@
   }
 
   window.FjordParcelMap = {
+    async snapshot(figure, data) {
+      const canvas = figure.querySelector('[data-map-url]');
+      const state = create(canvas, figure, true);
+      draw(state, data, figure.querySelector('[data-map-status]'));
+      const started = Date.now();
+      let mapError;
+      state.basemap.getMaplibreMap()?.on('error', event => { mapError = event.error; });
+      await new Promise((resolve, reject) => {
+        const check = () => {
+          const gl = state.basemap.getMaplibreMap();
+          if (mapError) { reject(mapError); return; }
+          if (gl?.loaded() && gl.areTilesLoaded()) { resolve(); return; }
+          if (Date.now() - started > 18000) { reject(new Error('Map background did not finish loading')); return; }
+          setTimeout(check, 100);
+        };
+        check();
+      });
+      await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+      return {points: data.points, segments: data.segments};
+    },
     open(details) {
       const canvas = details.querySelector('[data-map-url]');
       if (!canvas) return;

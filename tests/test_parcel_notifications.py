@@ -63,7 +63,7 @@ def test_initial_history_only_notifies_latest_and_existing_history_is_not_replay
 
 
 def test_bot_map_uses_snapshot_and_does_not_leak_internal_fields(db, monkeypatch):
-    import parcel_map
+    import parcel_map_image
     _, shipment = storage.add_shipment('MAP12345')
     events = [dict(date_iso='2026-11-07T12:00:00Z', description='Ankommet', location='Aarhus'),
               dict(date_iso='2026-11-06T12:00:00Z', description='Afsendt', location='Kolding')]
@@ -73,7 +73,7 @@ def test_bot_map_uses_snapshot_and_does_not_leak_internal_fields(db, monkeypatch
         con.execute('UPDATE shipments SET events_json=? WHERE id=?',
                     (json.dumps([dict(location='Guangzhou, CN')]), shipment['id']))
     captured = []
-    monkeypatch.setattr(parcel_map, 'render_map', lambda history: captured.append(history) or b'png')
+    monkeypatch.setattr(parcel_map_image, 'render_map_image', lambda history: captured.append(history) or b'png')
     sent = []
     assert notifications.deliver_one(lambda path,payload: sent.append(payload) or {'ok':True,'queued':True})
     assert captured == [events]
@@ -81,16 +81,17 @@ def test_bot_map_uses_snapshot_and_does_not_leak_internal_fields(db, monkeypatch
     assert '_map_events' not in sent[0]
 
 
-def test_map_failure_keeps_text_notification_working(db, monkeypatch):
-    import parcel_map
+def test_map_failure_keeps_notification_pending_until_image_is_ready(db, monkeypatch):
+    import parcel_map_image
     _, shipment = storage.add_shipment('MAP12345')
     with storage.get_connection() as con:
         con.execute('DELETE FROM parcel_notifications')
         notifications.enqueue(con, shipment, 'tracking_event', {'description':'På vej'}, events=[])
-    monkeypatch.setattr(parcel_map,'render_map',lambda history: (_ for _ in ()).throw(RuntimeError('map failed')))
+    monkeypatch.setattr(parcel_map_image,'render_map_image',lambda history: (_ for _ in ()).throw(RuntimeError('map failed')))
     sent=[]
-    assert notifications.deliver_one(lambda path,payload: sent.append(payload) or {'ok':True,'queued':True})
-    assert 'map_png' not in sent[0] and sent[0]['description']=='På vej'
+    assert not notifications.deliver_one(lambda path,payload: sent.append(payload) or {'ok':True,'queued':True})
+    assert not sent
+    assert not queued()[0]['delivered']
 
 
 def test_better_danish_is_not_a_new_event_without_provider_status(db):

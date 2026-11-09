@@ -1010,11 +1010,15 @@ def _redirect_index_from_form():
 def shipment_map(shipment_id):
     from flask import Response, abort
     from storage import get_shipment
-    from parcel_map import render_map
+    from parcel_map_image import render_map_image
     shipment = get_shipment(shipment_id)
     if not shipment or (shipment.get('hidden_by') and shipment['hidden_by'] != session.get('user_id')):
         abort(404)
-    image = render_map(shipment.get('events') or [])
+    try:
+        image = render_map_image(shipment.get('events') or [])
+    except Exception:
+        app.logger.exception('Could not render map image')
+        return Response('Kortet klargøres. Prøv igen om lidt.', status=503, headers={'Retry-After': '5'})
     response = Response(image or b'', status=200 if image else 204, mimetype='image/png')
     response.headers['Cache-Control'] = 'private, no-store'
     return response

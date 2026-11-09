@@ -21,6 +21,17 @@ def normalize(value):
     return ' '.join(re.findall(r'[^\W_]+', value, re.UNICODE))
 
 
+def city_name_keys(city):
+    names = set(city[5])
+    if city[1] == 'DK':
+        # Carriers use both stripped accents (Koge) and Danish digraphs
+        # (Koege). Add aliases to Danish places instead of globally replacing
+        # "oe"/"aa", which would change genuine foreign place names too.
+        names.update(name.casefold().replace('æ', 'ae').replace('ø', 'oe').replace('å', 'aa')
+                     for name in city[5])
+    return {normalize(name) for name in names}
+
+
 @lru_cache(maxsize=1)
 def gazetteer():
     with gzip.open(DATA / 'cities.json.gz', 'rt', encoding='utf-8') as source:
@@ -29,7 +40,7 @@ def gazetteer():
         countries = json.load(source)
     index, country_index = {}, {}
     for city in cities:
-        for alias in {normalize(alias) for alias in city[5]}:
+        for alias in city_name_keys(city):
             if len(alias) > 2:
                 index.setdefault(alias, []).append(city)
     # Carrier locations also use postal districts, e.g. HOLMEGAARD, DK, DK.
@@ -37,9 +48,9 @@ def gazetteer():
     with gzip.open(DATA / 'postal-dk.json.gz', 'rt', encoding='utf-8') as source:
         postal = json.load(source)
     for district in postal:
-        for alias in {normalize(name) for name in district[5]}:
-            if len(alias) > 2 and alias not in index:
-                index[alias] = [district]
+        for alias in city_name_keys(district):
+            if len(alias) > 2 and not any(city[1] == 'DK' for city in index.get(alias, [])):
+                index.setdefault(alias, []).append(district)
     for code, aliases, _ in countries:
         for alias in aliases:
             if alias:

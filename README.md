@@ -137,7 +137,8 @@ Leaflet 1.9.4 med BSD-licens er bundlet under `static/vendor/leaflet`.
 Nye trackinghændelser med genkendelige steder sender samme PNG-kort gennem
 FjordHubs botkø og som krypteret Matrix-billede. Begge apps og Matrix-botten
 skal opdateres. Allerede afsendte hændelser genudsendes ikke. Hvis der ingen
-kendte steder er, eller kortgenereringen fejler, sendes tekstbeskeden alene.
+kendte steder er, sendes tekstbeskeden alene. Hvis korttegningen eller en ny
+vejstrækning ikke er klar, venter botbeskeden i køen og forsøges igen.
 
 ### Danske hændelsestekster
 
@@ -146,3 +147,15 @@ Kendte hændelser fra fragtfirmaerne får faste danske formuleringer i
 bevarer udbyderens detaljer. Originalteksten gemmes til senere forbedringer.
 Bekræftede fejloversættelser i eksisterende historik rettes ved visning og ved
 levering af ventende botbeskeder, uden at gamle hændelser genudsendes.
+
+### Samme kort i appen og botbilleder
+
+`static/parcel-map.js` tegner både appens interaktive kort og PNG-billedet til
+botten. Begge bruger OpenFreeMap Liberty, de samme markører og den fælles
+rutecache fra `parcel_routes.py`. Satellitlaget er fortsat tilgængeligt i appen.
+`parcel_map_image.py` tager et 960×460 skærmbillede med den installerede
+Playwright-browser. Billeder caches under datamappen i `map-images/`, op til
+256 billeder. Trackingnumre og hændelsestekster sendes ikke til kortudbyderen.
+MapLibre GL JS 4.7.1 og MapLibre GL Leaflet 0.1.3 er bundlet under
+`static/vendor/maplibre` med deres licenser. OpenFreeMap: https://openfreemap.org/ .
+Til lokal browserkontrol kan `FJORDPARCEL_MAP_BROWSER=/usr/bin/chromium` bruges.

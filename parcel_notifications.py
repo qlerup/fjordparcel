@@ -73,7 +73,7 @@ def deliver_one(send):
         if payload.get('type') == 'tracking_event':
             try:
                 import base64
-                from parcel_map import render_map
+                from parcel_map_image import render_map_image
                 events = map_events if map_events is not None else json.loads(shipment['events_json'] or '[]')
                 # A delayed notification must not reveal later movements.
                 cutoff = payload.get('occurred_at')
@@ -83,11 +83,12 @@ def deliver_one(send):
                         date = datetime.fromisoformat(value.replace('Z', '+00:00'))
                         return date.replace(tzinfo=date.tzinfo or timezone.utc)
                     events = [e for e in events if e.get('date_iso') and event_time(e['date_iso']) <= event_time(cutoff)]
-                image = render_map(events)
+                image = render_map_image(events)
                 if image:
                     payload['map_png'] = base64.b64encode(image).decode('ascii')
             except Exception:
-                __import__('logging').getLogger(__name__).exception('Could not render parcel notification map')
+                __import__('logging').getLogger(__name__).exception('Could not render parcel notification map; retrying')
+                return False
         result = send('/api/hub/apps/notifications', payload)
     except Exception:
         return False
