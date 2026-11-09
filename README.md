@@ -153,9 +153,13 @@ levering af ventende botbeskeder, uden at gamle hændelser genudsendes.
 `static/parcel-map.js` tegner både appens interaktive kort og PNG-billedet til
 botten. Begge bruger OpenFreeMap Liberty, de samme markører og den fælles
 rutecache fra `parcel_routes.py`. Satellitlaget er fortsat tilgængeligt i appen.
-`parcel_map_image.py` tager et 960×460 skærmbillede med den installerede
+`parcel_map_image.py` tilpasser billedformatet til rutens retning og tager et skærmbillede med den installerede
 Playwright-browser. Billeder caches under datamappen i `map-images/`, op til
 256 billeder. Trackingnumre og hændelsestekster sendes ikke til kortudbyderen.
 MapLibre GL JS 4.7.1 og MapLibre GL Leaflet 0.1.3 er bundlet under
 `static/vendor/maplibre` med deres licenser. OpenFreeMap: https://openfreemap.org/ .
 Til lokal browserkontrol kan `FJORDPARCEL_MAP_BROWSER=/usr/bin/chromium` bruges.
+
+Kortets zoom og billedformat følger alle rutens koordinater. Lodrette rejser
+vises i et højt udsnit, vandrette i et bredt udsnit, med plads til bynavne og
+markører. Samme tilpasning bruges i appen og i botbilledet.

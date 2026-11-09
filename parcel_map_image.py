@@ -19,8 +19,8 @@ HTML = '''<!doctype html><html lang="da"><meta charset="utf-8">
 <link rel="stylesheet" href="/static/vendor/leaflet/leaflet.css">
 <link rel="stylesheet" href="/static/vendor/maplibre/maplibre-gl.css">
 <link rel="stylesheet" href="/static/styles.css">
-<style>html,body{margin:0;padding:0;width:960px;height:460px;background:white}
-.parcel-map{margin:0;border:0;border-radius:0}.parcel-map-canvas{height:460px;width:960px}
+<style>html,body{margin:0;padding:0;width:100vw;height:100vh;background:white}
+.parcel-map{margin:0;border:0;border-radius:0}.parcel-map-canvas{height:100vh;width:100vw}
 body{font-family:system-ui,Arial,sans-serif}</style>
 <figure class="parcel-map" data-parcel-map><button data-map-expand hidden></button>
 <p data-map-status hidden style="display:none"></p>
@@ -63,6 +63,8 @@ def _screenshot(data):
                     route.abort()
             page.route('**/*', resource)
             page.goto(ORIGIN, wait_until='load', timeout=10000)
+            size = page.evaluate('(data) => window.FjordParcelMap.frame(data)', data)
+            page.set_viewport_size(size)
             page.evaluate('(data) => window.FjordParcelMap.snapshot(document.querySelector("figure"),data)', data)
             image = page.locator('[data-map-url]').screenshot(type='png', timeout=5000)
             if len(image) > 500000:

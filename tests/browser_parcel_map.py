@@ -65,6 +65,14 @@ with tempfile.TemporaryDirectory() as folder:
             expect(canvas).to_be_visible()
             expect(page.locator('[data-map-status]')).to_contain_text('477 km', timeout=30000)
             expect(page.locator('.parcel-map-label')).to_have_count(2)
+            dimensions = page.locator('[data-map-url]').bounding_box()
+            assert dimensions['height'] > dimensions['width'], dimensions
+            extent = page.locator('.leaflet-overlay-pane path').first.evaluate('(path) => path.getBBox().height')
+            assert extent > dimensions['height'] * .7, (extent, dimensions)
+            portrait = page.evaluate("() => window.FjordParcelMap.frame({points:[{lat:50,lon:10},{lat:56,lon:12}],segments:[]})")
+            landscape = page.evaluate("() => window.FjordParcelMap.frame({points:[{lat:55,lon:5},{lat:55,lon:15}],segments:[]})")
+            assert portrait['height'] > portrait['width']
+            assert landscape['width'] > landscape['height']
             expect(page.locator('.parcel-map-label').last).to_contain_text('senest')
             settled_count = len(requests)
             assert page.evaluate('document.documentElement.scrollWidth <= innerWidth')

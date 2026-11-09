@@ -7,11 +7,47 @@
     return node;
   };
 
+  function routeCoordinates(data) {
+    return data.points.map(p => [p.lat, p.lon]).concat(
+      data.segments.filter(s => s.state === 'road').flatMap(s => s.coordinates));
+  }
+
+  function frame(data) {
+    const coordinates = routeCoordinates(data);
+    const bounds = L.latLngBounds(coordinates);
+    const sw = L.CRS.EPSG3857.project(bounds.getSouthWest());
+    const ne = L.CRS.EPSG3857.project(bounds.getNorthEast());
+    if (sw.equals(ne)) return {width: 640, height: 640};
+    const aspect = Math.max(.6, Math.min(1.8, (ne.x - sw.x) / Math.max(1, ne.y - sw.y)));
+    const width = Math.round(Math.min(960, 760 * aspect));
+    return {width, height: Math.round(width / aspect)};
+  }
+
+  function fitRoute(state, bounds, data) {
+    if (!state.snapshot) {
+      const canvas = state.map.getContainer();
+      const size = frame(data);
+      const aspect = size.width / size.height;
+      const expanded = canvas.closest('[data-parcel-map]').classList.contains('is-expanded');
+      const availableHeight = window.innerHeight * (expanded ? .85 : .72);
+      const height = Math.min(expanded ? 1000 : 700, Math.max(300, availableHeight), canvas.parentElement.clientWidth / aspect);
+      canvas.style.height = `${height}px`;
+      canvas.style.maxWidth = `${height * aspect}px`;
+      canvas.style.marginInline = 'auto';
+      state.map.invalidateSize({pan: false});
+    }
+    const labelPadding = Math.min(110, Math.max(28, ...data.points.map(p => p.name.length * 3.5 + 10)));
+    state.map.fitBounds(bounds, {
+      paddingTopLeft: [labelPadding, 46], paddingBottomRight: [labelPadding, 28],
+      maxZoom: data.points.length === 1 ? 12 : 18, animate: false,
+    });
+  }
+
   function create(canvas, figure, snapshot = false) {
     const L = window.L;
     if (!L) throw new Error('Leaflet unavailable');
     canvas.hidden = false;
-    const map = L.map(canvas, {scrollWheelZoom: true, maxZoom: 19, zoomAnimation: !snapshot, fadeAnimation: !snapshot});
+    const map = L.map(canvas, {scrollWheelZoom: true, maxZoom: 19, zoomSnap: 0, zoomDelta: .5, zoomAnimation: !snapshot, fadeAnimation: !snapshot});
     const streets = L.maplibreGL({
       style: 'https://tiles.openfreemap.org/styles/liberty',
       preserveDrawingBuffer: snapshot,
@@ -24,7 +60,7 @@
     L.control.layers({'Vejkort': streets, 'Satellit': satellite}, {}, {collapsed: true}).addTo(map);
     const observer = new ResizeObserver(() => {
       if (!canvas.isConnected) { observer.disconnect(); return; }
-      if (canvas.clientWidth) map.invalidateSize({pan: false});
+      if (canvas.clientWidth) { map.invalidateSize({pan: false}); map._fjordRefit?.(); }
     });
     observer.observe(canvas);
     figure.querySelector('[data-map-expand]').addEventListener('click', event => {
@@ -32,8 +68,9 @@
       event.currentTarget.setAttribute('aria-pressed', String(expanded));
       event.currentTarget.textContent = expanded ? 'Lille kort' : 'Stort kort';
       map.invalidateSize({pan: false});
+      map._fjordRefit?.();
     });
-    return {map, basemap: streets, lines: L.layerGroup().addTo(map), markers: L.layerGroup().addTo(map)};
+    return {map, snapshot, basemap: streets, lines: L.layerGroup().addTo(map), markers: L.layerGroup().addTo(map)};
   }
 
   function draw(state, data, status) {
@@ -72,8 +109,9 @@
           permanent: true, direction: 'top', offset: [0, -10], className: 'parcel-map-label',
         }).addTo(state.markers);
     });
+    state.map._fjordRefit = () => fitRoute(state, bounds, data);
     if (!state.fitted || (!data.pending && !state.settled)) {
-      state.map.fitBounds(bounds, {padding: [45, 55], maxZoom: 10});
+      fitRoute(state, bounds, data);
       state.fitted = true;
       state.settled = !data.pending;
     }
@@ -127,6 +165,7 @@
   }
 
   window.FjordParcelMap = {
+    frame,
     async snapshot(figure, data) {
       const canvas = figure.querySelector('[data-map-url]');
       const state = create(canvas, figure, true);
